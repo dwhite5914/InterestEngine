@@ -128,6 +128,7 @@ public class RoutePainter implements Painter<JXMapViewer>
             GeoPosition currentPosition = ship.getCurrentPosition();
             if (currentPosition != null)
             {
+                System.out.println("CURRPOS");
                 Point2D shipPosition = map.convertGeoPositionToPoint(currentPosition);
                 if (g.getClip().contains(shipPosition))
                 {

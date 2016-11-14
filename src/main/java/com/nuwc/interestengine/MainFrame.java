@@ -19,6 +19,8 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
 import org.jxmapviewer.JXMapKit;
 import org.jxmapviewer.viewer.GeoPosition;
 
@@ -40,13 +42,23 @@ public class MainFrame extends JFrame implements KeyListener
     {
         super();
         
+        try
+        {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        }
+        catch (ClassNotFoundException | InstantiationException
+                | IllegalAccessException | UnsupportedLookAndFeelException e)
+        {
+            System.out.println("Look and feel not found.");
+        }
+        
         setTitle("Contact of Interest Engine");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setMinimumSize(new Dimension(MIN_WIDTH, MIN_HEIGHT));
         
         initKeyListener();
         
-        optionsPanel = new OptionsPanel();
+        optionsPanel = new OptionsPanel(getShips());
         mapPanel = getMap();
         setLayout(new BorderLayout());
         add(mapPanel, BorderLayout.CENTER);

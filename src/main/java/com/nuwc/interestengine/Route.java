@@ -16,7 +16,7 @@ public class Route
 {
     private static int REFRESH_TIME = 1000;
     private List<Marker> markers;
-    private double speed = 0.00001;
+    private double speed = 0.02;
     private RouteState state;
     private Thread simulator;
     private GeoPosition currentPosition;
@@ -24,18 +24,20 @@ public class Route
     
     public Route(Ship ship, List<Marker> markers)
     {
+        this.ship = ship;
         this.markers = markers;
-        state = RouteState.STOPPED;
+        start();
     }
     
-    public void start()
+    private void start()
     {
-        if (state == RouteState.STOPPED)
+        if (simulator == null)
         {
-            simulator.start();
-            state = RouteState.RUNNING;
-            ship.fireRouteStateChange();
+            simulator = new Thread(new Simulator());
+            simulator.setDaemon(true);
         }
+        simulator.start();
+        state = RouteState.RUNNING;
     }
     
     public void stop()
@@ -95,22 +97,23 @@ public class Route
     {
         private final double THRESH = 2 * speed;
         
+        public Simulator() {}
+        
         @Override
         public void run()
         {
-            fireRouteStarted();
             if (markers.size() < 2)
             {
                 return;
             }
-            
-            for (int edge = 0; edge < markers.size(); edge++)
+            fireRouteStarted();
+            for (int edge = 0; edge < markers.size() - 1; edge++)
             {
                 Marker start = markers.get(edge);
                 Marker end = markers.get(edge + 1);
                 currentPosition = start.getPosition();
                 RUN: while (state != RouteState.STOPPED &&
-                        Utils.distance(start, currentPosition) > THRESH)
+                        Utils.distance(currentPosition, end) > THRESH)
                 {
                     firePositionUpdate(currentPosition);
                     updatePosition(start, end);

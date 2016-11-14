@@ -5,18 +5,21 @@
  */
 package com.nuwc.interestengine;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  *
  * @author Dan
  */
 public class OptionsPanel extends javax.swing.JPanel
 {
-
-    /**
-     * Creates new form OptionsPanel
-     */
-    public OptionsPanel()
+    List<Ship> ships;
+    
+    public OptionsPanel(List<Ship> ships)
     {
+        this.ships = ships;
+        
         initComponents();
     }
 
@@ -30,18 +33,51 @@ public class OptionsPanel extends javax.swing.JPanel
     private void initComponents()
     {
 
-        jButton1 = new javax.swing.JButton();
-        jButton2 = new javax.swing.JButton();
-        jTextField1 = new javax.swing.JTextField();
-        jTextField2 = new javax.swing.JTextField();
+        nameLabel = new javax.swing.JLabel();
+        nameTextField = new javax.swing.JTextField();
+        typeLabel = new javax.swing.JLabel();
+        typeComboBox = new javax.swing.JComboBox();
+        playButton = new javax.swing.JToggleButton();
+        pauseButton = new javax.swing.JToggleButton();
+        stopButton = new javax.swing.JToggleButton();
 
-        jButton1.setText("jButton1");
+        nameLabel.setText("Name:");
 
-        jButton2.setText("jButton2");
+        nameTextField.setText("Default Ship");
 
-        jTextField1.setText("jTextField1");
+        typeLabel.setText("Type:");
 
-        jTextField2.setText("jTextField1");
+        typeComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Cargo Vessel", "Tanker", "Passenger Vessel", "High Speed Craft", "Tugs and Special Craft", "Fishing", "Pleasure Craft" }));
+
+        playButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/gui/resources/route-play.png"))); // NOI18N
+        playButton.setText("Play");
+        playButton.addActionListener(new java.awt.event.ActionListener()
+        {
+            public void actionPerformed(java.awt.event.ActionEvent evt)
+            {
+                playButtonActionPerformed(evt);
+            }
+        });
+
+        pauseButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/gui/resources/route-pause.png"))); // NOI18N
+        pauseButton.setText("Pause");
+        pauseButton.addActionListener(new java.awt.event.ActionListener()
+        {
+            public void actionPerformed(java.awt.event.ActionEvent evt)
+            {
+                pauseButtonActionPerformed(evt);
+            }
+        });
+
+        stopButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/gui/resources/route-stop.png"))); // NOI18N
+        stopButton.setText("Stop");
+        stopButton.addActionListener(new java.awt.event.ActionListener()
+        {
+            public void actionPerformed(java.awt.event.ActionEvent evt)
+            {
+                stopButtonActionPerformed(evt);
+            }
+        });
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(this);
         this.setLayout(layout);
@@ -51,11 +87,19 @@ public class OptionsPanel extends javax.swing.JPanel
                 .addContainerGap()
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                     .addGroup(layout.createSequentialGroup()
-                        .addComponent(jButton1)
-                        .addGap(18, 18, 18)
-                        .addComponent(jButton2))
-                    .addComponent(jTextField1, javax.swing.GroupLayout.DEFAULT_SIZE, 200, Short.MAX_VALUE)
-                    .addComponent(jTextField2))
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(nameLabel)
+                            .addComponent(typeLabel))
+                        .addGap(34, 34, 34)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(typeComboBox, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                            .addComponent(nameTextField)))
+                    .addGroup(layout.createSequentialGroup()
+                        .addComponent(playButton)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addComponent(pauseButton)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addComponent(stopButton)))
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
         layout.setVerticalGroup(
@@ -63,21 +107,72 @@ public class OptionsPanel extends javax.swing.JPanel
             .addGroup(layout.createSequentialGroup()
                 .addContainerGap()
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(jButton1)
-                    .addComponent(jButton2))
+                    .addComponent(nameLabel)
+                    .addComponent(nameTextField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(typeLabel)
+                    .addComponent(typeComboBox, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addGap(18, 18, 18)
-                .addComponent(jTextField1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(18, 18, 18)
-                .addComponent(jTextField2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(490, Short.MAX_VALUE))
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(playButton)
+                    .addComponent(pauseButton)
+                    .addComponent(stopButton))
+                .addContainerGap(489, Short.MAX_VALUE))
         );
     }// </editor-fold>//GEN-END:initComponents
 
+    private void playButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_playButtonActionPerformed
+    {//GEN-HEADEREND:event_playButtonActionPerformed
+        for (Ship ship : ships)
+        {
+            if (ship.getRoute() == null)
+            {
+                System.out.println("NULLTEST");
+                ship.startRoute();
+            }
+        }
+    }//GEN-LAST:event_playButtonActionPerformed
+
+    private void pauseButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_pauseButtonActionPerformed
+    {//GEN-HEADEREND:event_pauseButtonActionPerformed
+        for (Ship ship : ships)
+        {
+            Route route = ship.getRoute();
+            if (route != null)
+            {
+                if (route.getState() == RouteState.PAUSED)
+                {
+                    route.unpause();
+                }
+                else
+                {
+                    route.pause();
+                }
+            }
+        }
+    }//GEN-LAST:event_pauseButtonActionPerformed
+
+    private void stopButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_stopButtonActionPerformed
+    {//GEN-HEADEREND:event_stopButtonActionPerformed
+        for (Ship ship : ships)
+        {
+            Route route = ship.getRoute();
+            if (route != null)
+            {
+                route.stop();
+            }
+        }
+    }//GEN-LAST:event_stopButtonActionPerformed
+
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
-    private javax.swing.JButton jButton1;
-    private javax.swing.JButton jButton2;
-    private javax.swing.JTextField jTextField1;
-    private javax.swing.JTextField jTextField2;
+    private javax.swing.JLabel nameLabel;
+    private javax.swing.JTextField nameTextField;
+    private javax.swing.JToggleButton pauseButton;
+    private javax.swing.JToggleButton playButton;
+    private javax.swing.JToggleButton stopButton;
+    private javax.swing.JComboBox typeComboBox;
+    private javax.swing.JLabel typeLabel;
     // End of variables declaration//GEN-END:variables
 }
