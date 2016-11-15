@@ -5,8 +5,8 @@
  */
 package com.nuwc.interestengine;
 
-import java.util.ArrayList;
 import java.util.List;
+import javax.swing.ImageIcon;
 
 /**
  *
@@ -14,13 +14,69 @@ import java.util.List;
  */
 public class OptionsPanel extends javax.swing.JPanel
 {
-    List<Ship> ships;
+    private List<Ship> ships;
+    private Simulation simulation;
     
-    public OptionsPanel(List<Ship> ships)
+    public OptionsPanel(List<Ship> ships, Simulation simulation)
     {
         this.ships = ships;
+        this.simulation = simulation;
         
+        initListeners();
         initComponents();
+    }
+    
+    private void initListeners()
+    {
+        simulation.addSimulationChangeListener(new StateChangeListener());
+    }
+    
+    private ImageIcon getPlayIcon()
+    {
+        String path = "/com/nuwc/interestengine/gui/resources/route-play.png";
+        return new ImageIcon(getClass().getResource(path));
+    }
+    
+    private ImageIcon getPauseIcon()
+    {
+        String path = "/com/nuwc/interestengine/gui/resources/route-pause.png";
+        return new ImageIcon(getClass().getResource(path));
+    }
+    
+    private ImageIcon getStopIcon()
+    {
+        String path = "/com/nuwc/interestengine/gui/resources/route-stop.png";
+        return new ImageIcon(getClass().getResource(path));
+    }
+    
+    private class StateChangeListener implements SimulationChangeListener
+    {
+        public StateChangeListener() {}
+        
+        @Override
+        public void stateChanged()
+        {
+            SimulationState state = simulation.getState();
+            if (state == SimulationState.STOPPED)
+            {
+                playPauseButton.setIcon(getPlayIcon());
+                playPauseButton.setText("Play");
+                stopButton.setEnabled(false);
+            }
+            else if (state == SimulationState.PAUSED)
+            {
+                playPauseButton.setIcon(getPlayIcon());
+                playPauseButton.setText("Play");
+                stopButton.setEnabled(true);
+            }
+            else
+            {
+                playPauseButton.setIcon(getPauseIcon());
+                playPauseButton.setText("Pause");
+                stopButton.setEnabled(true);
+            }
+        }
+        
     }
 
     /**
@@ -37,9 +93,8 @@ public class OptionsPanel extends javax.swing.JPanel
         nameTextField = new javax.swing.JTextField();
         typeLabel = new javax.swing.JLabel();
         typeComboBox = new javax.swing.JComboBox();
-        playButton = new javax.swing.JToggleButton();
-        pauseButton = new javax.swing.JToggleButton();
-        stopButton = new javax.swing.JToggleButton();
+        playPauseButton = new javax.swing.JButton();
+        stopButton = new javax.swing.JButton();
 
         nameLabel.setText("Name:");
 
@@ -49,28 +104,21 @@ public class OptionsPanel extends javax.swing.JPanel
 
         typeComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Cargo Vessel", "Tanker", "Passenger Vessel", "High Speed Craft", "Tugs and Special Craft", "Fishing", "Pleasure Craft" }));
 
-        playButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/gui/resources/route-play.png"))); // NOI18N
-        playButton.setText("Play");
-        playButton.addActionListener(new java.awt.event.ActionListener()
+        playPauseButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/gui/resources/route-play.png"))); // NOI18N
+        playPauseButton.setText("Play");
+        playPauseButton.setFocusable(false);
+        playPauseButton.addActionListener(new java.awt.event.ActionListener()
         {
             public void actionPerformed(java.awt.event.ActionEvent evt)
             {
-                playButtonActionPerformed(evt);
-            }
-        });
-
-        pauseButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/gui/resources/route-pause.png"))); // NOI18N
-        pauseButton.setText("Pause");
-        pauseButton.addActionListener(new java.awt.event.ActionListener()
-        {
-            public void actionPerformed(java.awt.event.ActionEvent evt)
-            {
-                pauseButtonActionPerformed(evt);
+                playPauseButtonActionPerformed(evt);
             }
         });
 
         stopButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/gui/resources/route-stop.png"))); // NOI18N
         stopButton.setText("Stop");
+        stopButton.setEnabled(false);
+        stopButton.setFocusable(false);
         stopButton.addActionListener(new java.awt.event.ActionListener()
         {
             public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -85,22 +133,20 @@ public class OptionsPanel extends javax.swing.JPanel
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(layout.createSequentialGroup()
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(nameLabel)
                             .addComponent(typeLabel))
                         .addGap(34, 34, 34)
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(typeComboBox, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                            .addComponent(typeComboBox, 0, 200, Short.MAX_VALUE)
                             .addComponent(nameTextField)))
                     .addGroup(layout.createSequentialGroup()
-                        .addComponent(playButton)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addComponent(pauseButton)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addComponent(stopButton)))
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                        .addComponent(playPauseButton, javax.swing.GroupLayout.PREFERRED_SIZE, 130, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(stopButton, javax.swing.GroupLayout.PREFERRED_SIZE, 130, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                .addContainerGap(11, Short.MAX_VALUE))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -115,63 +161,55 @@ public class OptionsPanel extends javax.swing.JPanel
                     .addComponent(typeComboBox, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addGap(18, 18, 18)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(playButton)
-                    .addComponent(pauseButton)
+                    .addComponent(playPauseButton)
                     .addComponent(stopButton))
                 .addContainerGap(489, Short.MAX_VALUE))
         );
     }// </editor-fold>//GEN-END:initComponents
 
-    private void playButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_playButtonActionPerformed
-    {//GEN-HEADEREND:event_playButtonActionPerformed
-        for (Ship ship : ships)
+    private void playPauseButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_playPauseButtonActionPerformed
+    {//GEN-HEADEREND:event_playPauseButtonActionPerformed
+        playPauseButton.setEnabled(false);
+        SimulationState state = simulation.getState();
+        if (state == SimulationState.STOPPED)
         {
-            if (ship.getRoute() == null)
-            {
-                System.out.println("NULLTEST");
-                ship.startRoute();
-            }
+            playPauseButton.setIcon(getPauseIcon());
+            playPauseButton.setText("Pause");
+            simulation.start();
         }
-    }//GEN-LAST:event_playButtonActionPerformed
-
-    private void pauseButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_pauseButtonActionPerformed
-    {//GEN-HEADEREND:event_pauseButtonActionPerformed
-        for (Ship ship : ships)
+        else if (state == SimulationState.PAUSED)
         {
-            Route route = ship.getRoute();
-            if (route != null)
-            {
-                if (route.getState() == RouteState.PAUSED)
-                {
-                    route.unpause();
-                }
-                else
-                {
-                    route.pause();
-                }
-            }
+            playPauseButton.setIcon(getPauseIcon());
+            playPauseButton.setText("Pause");
+            simulation.unpause();
         }
-    }//GEN-LAST:event_pauseButtonActionPerformed
+        else
+        {
+            playPauseButton.setIcon(getPlayIcon());
+            playPauseButton.setText("Play");
+            simulation.pause();
+        }
+        stopButton.setEnabled(true);
+        playPauseButton.setEnabled(true);
+    }//GEN-LAST:event_playPauseButtonActionPerformed
 
     private void stopButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_stopButtonActionPerformed
     {//GEN-HEADEREND:event_stopButtonActionPerformed
-        for (Ship ship : ships)
+        stopButton.setEnabled(false);
+        SimulationState state = simulation.getState();
+        if (state != SimulationState.STOPPED)
         {
-            Route route = ship.getRoute();
-            if (route != null)
-            {
-                route.stop();
-            }
+            playPauseButton.setIcon(getPlayIcon());
+            playPauseButton.setText("Play");
+            simulation.stop();
         }
     }//GEN-LAST:event_stopButtonActionPerformed
-
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JLabel nameLabel;
     private javax.swing.JTextField nameTextField;
-    private javax.swing.JToggleButton pauseButton;
-    private javax.swing.JToggleButton playButton;
-    private javax.swing.JToggleButton stopButton;
+    private javax.swing.JButton playPauseButton;
+    private javax.swing.JButton stopButton;
     private javax.swing.JComboBox typeComboBox;
     private javax.swing.JLabel typeLabel;
     // End of variables declaration//GEN-END:variables

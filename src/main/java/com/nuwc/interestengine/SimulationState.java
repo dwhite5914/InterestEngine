@@ -9,9 +9,9 @@ package com.nuwc.interestengine;
  *
  * @author Dan
  */
-public interface RouteChangeListener
+public enum SimulationState
 {
-    public void routeChanged();
-    
-    public void routeEnded();
+    RUNNING,
+    PAUSED,
+    STOPPED
 }

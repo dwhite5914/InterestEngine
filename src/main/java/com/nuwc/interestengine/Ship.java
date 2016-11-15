@@ -116,6 +116,7 @@ public class Ship
         route = null;
         currentPosition = null;
         fire(RouteEvent.CHANGE);
+        fire(RouteEvent.ENDED);
     }
     
     public void fireRouteStateChange()
@@ -141,11 +142,18 @@ public class Ship
                 listener.routeChanged();
             }
         }
+        else if (e == RouteEvent.ENDED)
+        {
+            for (RouteChangeListener listener : routeChangeListeners)
+            {
+                listener.routeEnded();
+            }
+        }
     }
     
     private enum RouteEvent
     {
         CHANGE,
-        TOOL
+        ENDED
     }
 }

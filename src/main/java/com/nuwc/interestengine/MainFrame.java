@@ -37,6 +37,7 @@ public class MainFrame extends JFrame implements KeyListener
     private JPanel optionsPanel;
     private List<Ship> ships;
     private RoutePainter routePainter;
+    private Simulation simulation;
     
     public MainFrame()
     {
@@ -58,7 +59,7 @@ public class MainFrame extends JFrame implements KeyListener
         
         initKeyListener();
         
-        optionsPanel = new OptionsPanel(getShips());
+        optionsPanel = new OptionsPanel(getShips(), getSimulation());
         mapPanel = getMap();
         setLayout(new BorderLayout());
         add(mapPanel, BorderLayout.CENTER);
@@ -107,12 +108,28 @@ public class MainFrame extends JFrame implements KeyListener
         return ships;
     }
     
+    private Simulation getSimulation()
+    {
+        if (simulation == null)
+        {
+            simulation = new Simulation(getShips());
+        }
+        
+        return simulation;
+    }
+    
     private class RouteListener implements RouteChangeListener
     {
         @Override
         public void routeChanged()
         {
             getMap().repaint();
+        }
+        
+        @Override
+        public void routeEnded()
+        {
+            getSimulation().decShips();
         }
     }
     

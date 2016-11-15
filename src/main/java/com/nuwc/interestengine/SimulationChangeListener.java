@@ -9,9 +9,7 @@ package com.nuwc.interestengine;
  *
  * @author Dan
  */
-public interface RouteChangeListener
+public interface SimulationChangeListener
 {
-    public void routeChanged();
-    
-    public void routeEnded();
+    public void stateChanged();
 }
