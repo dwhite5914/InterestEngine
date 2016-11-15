@@ -4,7 +4,7 @@
  * and open the template in the editor.
  */
 package com.nuwc.interestengine;
-
+/*
 import java.awt.BorderLayout;
 import java.io.File;
 import javax.swing.JFrame;
@@ -19,7 +19,7 @@ import org.jxmapviewer.viewer.DefaultTileFactory;
 import org.jxmapviewer.viewer.GeoPosition;
 import org.jxmapviewer.viewer.LocalResponseCache;
 import org.jxmapviewer.viewer.TileFactoryInfo;
-
+/*
 /**
  *
  * @author Dan
@@ -28,6 +28,7 @@ public class InterestEngine
 {
     public static void main(String args[])
     {
+        /*
         JXMapViewer mapViewer = new JXMapViewer();
         
         // Create a TileFactoryInfo for OpenStreetMap
@@ -63,6 +64,7 @@ public class InterestEngine
         frame.setSize(800, 600);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         //frame.setVisible(true);
+        */
         
         MainFrame mainFrame = new MainFrame();
         mainFrame.setVisible(true);

@@ -25,7 +25,7 @@ public class RoutePainter implements Painter<JXMapViewer>
     private final Color LINE_COLOR = Color.BLACK;
     private final Color SELECTED_LINE_COLOR = Color.RED;
     private final Color MARKER_COLOR = Color.BLUE;
-    private final Color SHIP_COLOR = Color.RED;
+        private final Color SHIP_COLOR = Color.RED;
     private final Color START_COLOR = Color.YELLOW;
     private final Color END_COLOR = Color.GREEN;
     

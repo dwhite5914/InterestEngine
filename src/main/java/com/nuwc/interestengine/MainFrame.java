@@ -30,6 +30,7 @@ import org.jxmapviewer.viewer.GeoPosition;
  */
 public class MainFrame extends JFrame implements KeyListener
 {
+    //Attributes
     private static final int MIN_WIDTH = 800;
     private static final int MIN_HEIGHT = 600;
     private JXMapKit mapKit;
@@ -41,6 +42,7 @@ public class MainFrame extends JFrame implements KeyListener
     
     public MainFrame()
     {
+        //Calls parent class constructor
         super();
         
         try
@@ -52,15 +54,18 @@ public class MainFrame extends JFrame implements KeyListener
         {
             System.out.println("Look and feel not found.");
         }
-        
+        //Sets Window name, dimensions and close operation
         setTitle("Contact of Interest Engine");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setMinimumSize(new Dimension(MIN_WIDTH, MIN_HEIGHT));
         
         initKeyListener();
         
+        /*Initializes Panel with ship arraylist and initializes 
+        simulation state in a stopped state
+        */
         optionsPanel = new OptionsPanel(getShips(), getSimulation());
-        mapPanel = getMap();
+        mapPanel = getMap();      //Creates instance of JXMapKit()
         setLayout(new BorderLayout());
         add(mapPanel, BorderLayout.CENTER);
         add(optionsPanel, BorderLayout.EAST);
@@ -75,6 +80,7 @@ public class MainFrame extends JFrame implements KeyListener
     
     private JXMapKit getMap()
     {
+        //If no instance of of JXMapKit() exists
         if (mapKit == null)
         {
             mapKit = new JXMapKit();
@@ -90,6 +96,7 @@ public class MainFrame extends JFrame implements KeyListener
     
     private RoutePainter getRoutePainter()
     {
+        //If no instance exists, create RoutePainter()
         if (routePainter == null)
         {
             routePainter = new RoutePainter(getShips());
@@ -110,6 +117,7 @@ public class MainFrame extends JFrame implements KeyListener
     
     private Simulation getSimulation()
     {
+        //Initializes simulation and set to stop
         if (simulation == null)
         {
             simulation = new Simulation(getShips());
