@@ -21,8 +21,10 @@ public class Simulation
     private List<Ship> ships;
     private List<SimulationChangeListener> simulationChangeListeners;
     
+    // Constructor
     public Simulation(List<Ship> ships)
     {
+        // Start in a stopped state
         this.runningShips = 0;
         this.state = SimulationState.STOPPED;
         this.ships = ships;
@@ -31,6 +33,7 @@ public class Simulation
     
     public synchronized void start()
     {
+        // For each ship, start its route
         for (Ship ship : ships)
         {
             if (ship.getRoute() == null)
@@ -45,6 +48,7 @@ public class Simulation
     
     public synchronized void pause()
     {
+        // For each ship, pause its route
         for (Ship ship : ships)
         {
             Route route = ship.getRoute();
@@ -59,6 +63,7 @@ public class Simulation
     
     public synchronized void unpause()
     {
+        // For each ship in a paused state, resume
         for (Ship ship : ships)
         {
             Route route = ship.getRoute();
@@ -73,6 +78,7 @@ public class Simulation
     
     public synchronized void stop()
     {
+        // For each ship in a running state, stop
         for (Ship ship : ships)
         {
             Route route = ship.getRoute();
@@ -81,6 +87,7 @@ public class Simulation
                 route.stop();
             }
         }
+        // Resets number of running ships to zero
         runningShips = 0;
         state = SimulationState.STOPPED;
         fire(SimulationEvent.STATE_CHANGED);
@@ -88,6 +95,7 @@ public class Simulation
     
     public synchronized void decShips()
     {
+        // Decrease number of running ships by one
         runningShips--;
         if (runningShips == 0)
         {

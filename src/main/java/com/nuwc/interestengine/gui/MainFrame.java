@@ -35,6 +35,7 @@ import org.jxmapviewer.viewer.GeoPosition;
  */
 public class MainFrame extends JFrame implements KeyListener
 {
+    // Attributes
     private static final int MIN_WIDTH = 800;
     private static final int MIN_HEIGHT = 600;
     private JXMapKit mapKit;
@@ -46,6 +47,7 @@ public class MainFrame extends JFrame implements KeyListener
     
     public MainFrame()
     {
+        // Calls parent class constructor
         super();
         
         try
@@ -58,6 +60,7 @@ public class MainFrame extends JFrame implements KeyListener
             System.out.println("Look and feel not found.");
         }
         
+        // Sets window title, dimensions, and close operation
         setTitle("Contact of Interest Engine");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setMinimumSize(new Dimension(MIN_WIDTH, MIN_HEIGHT));
@@ -68,6 +71,9 @@ public class MainFrame extends JFrame implements KeyListener
     
     private void initComponents()
     {
+        /* Initialize options panel with ship list and initial
+         * simulation state of stopped.
+         */
         optionsPanel = new OptionsPanel(getShips(), getSimulation());
         mapPanel = getMap();
         setLayout(new BorderLayout());
@@ -84,6 +90,7 @@ public class MainFrame extends JFrame implements KeyListener
     
     private JXMapKit getMap()
     {
+        // If no instance of JXMapKit exists, create one
         if (mapKit == null)
         {
             mapKit = new JXMapKit();
@@ -99,6 +106,7 @@ public class MainFrame extends JFrame implements KeyListener
     
     private RoutePainter getRoutePainter()
     {
+        // If no instance of RoutePainter exists, create one
         if (routePainter == null)
         {
             routePainter = new RoutePainter(getShips());
@@ -109,6 +117,7 @@ public class MainFrame extends JFrame implements KeyListener
     
     private List<Ship> getShips()
     {
+        // If no ship list exists, create one
         if (ships == null)
         {
             ships = new ArrayList<>();
@@ -119,6 +128,7 @@ public class MainFrame extends JFrame implements KeyListener
     
     private Simulation getSimulation()
     {
+        // If no Simulation exists, create one
         if (simulation == null)
         {
             simulation = new Simulation(getShips());
