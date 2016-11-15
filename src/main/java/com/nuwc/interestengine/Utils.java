@@ -5,6 +5,7 @@
  */
 package com.nuwc.interestengine;
 
+import com.nuwc.interestengine.map.Marker;
 import org.jxmapviewer.viewer.GeoPosition;
 
 /**

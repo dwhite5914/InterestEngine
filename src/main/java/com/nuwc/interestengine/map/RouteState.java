@@ -3,15 +3,15 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.nuwc.interestengine;
+package com.nuwc.interestengine.map;
 
 /**
  *
  * @author Dan
  */
-public enum SimulationState
+public enum RouteState
 {
-    RUNNING,
     PAUSED,
+    RUNNING,
     STOPPED
 }

@@ -3,8 +3,12 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.nuwc.interestengine;
+package com.nuwc.interestengine.gui;
 
+import com.nuwc.interestengine.map.Ship;
+import com.nuwc.interestengine.simulation.Simulation;
+import com.nuwc.interestengine.simulation.SimulationChangeListener;
+import com.nuwc.interestengine.simulation.SimulationState;
 import java.util.List;
 import javax.swing.ImageIcon;
 
@@ -33,20 +37,63 @@ public class OptionsPanel extends javax.swing.JPanel
     
     private ImageIcon getPlayIcon()
     {
-        String path = "/com/nuwc/interestengine/gui/resources/route-play.png";
+        String path = "/com/nuwc/interestengine/resources/gui/route-play.png";
         return new ImageIcon(getClass().getResource(path));
     }
     
     private ImageIcon getPauseIcon()
     {
-        String path = "/com/nuwc/interestengine/gui/resources/route-pause.png";
+        String path = "/com/nuwc/interestengine/resources/gui/route-pause.png";
         return new ImageIcon(getClass().getResource(path));
     }
     
     private ImageIcon getStopIcon()
     {
-        String path = "/com/nuwc/interestengine/gui/resources/route-stop.png";
+        String path = "/com/nuwc/interestengine/resources/gui/route-stop.png";
         return new ImageIcon(getClass().getResource(path));
+    }
+    
+    public void interruptSimulation()
+    {
+        if (simulation.getState() != SimulationState.STOPPED)
+        {
+            simulation.stop();
+        }
+        
+        updatePanel();
+    }
+    
+    public synchronized void updatePanel()
+    {
+        SimulationState state = simulation.getState();
+        if (ships.isEmpty())
+        {
+            playPauseButton.setIcon(getPlayIcon());
+            playPauseButton.setText("Play");
+            stopButton.setEnabled(false);
+            playPauseButton.setEnabled(false);
+        }
+        else if (state == SimulationState.STOPPED)
+        {
+            playPauseButton.setIcon(getPlayIcon());
+            playPauseButton.setText("Play");
+            stopButton.setEnabled(false);
+            playPauseButton.setEnabled(true);
+        }
+        else if (state == SimulationState.PAUSED)
+        {
+            playPauseButton.setIcon(getPlayIcon());
+            playPauseButton.setText("Play");
+            stopButton.setEnabled(true);
+            playPauseButton.setEnabled(true);
+        }
+        else
+        {
+            playPauseButton.setIcon(getPauseIcon());
+            playPauseButton.setText("Pause");
+            stopButton.setEnabled(true);
+            playPauseButton.setEnabled(true);
+        }
     }
     
     private class StateChangeListener implements SimulationChangeListener
@@ -56,27 +103,8 @@ public class OptionsPanel extends javax.swing.JPanel
         @Override
         public void stateChanged()
         {
-            SimulationState state = simulation.getState();
-            if (state == SimulationState.STOPPED)
-            {
-                playPauseButton.setIcon(getPlayIcon());
-                playPauseButton.setText("Play");
-                stopButton.setEnabled(false);
-            }
-            else if (state == SimulationState.PAUSED)
-            {
-                playPauseButton.setIcon(getPlayIcon());
-                playPauseButton.setText("Play");
-                stopButton.setEnabled(true);
-            }
-            else
-            {
-                playPauseButton.setIcon(getPauseIcon());
-                playPauseButton.setText("Pause");
-                stopButton.setEnabled(true);
-            }
+            updatePanel();
         }
-        
     }
 
     /**
@@ -104,9 +132,9 @@ public class OptionsPanel extends javax.swing.JPanel
 
         typeComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Cargo Vessel", "Tanker", "Passenger Vessel", "High Speed Craft", "Tugs and Special Craft", "Fishing", "Pleasure Craft" }));
 
-        playPauseButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/gui/resources/route-play.png"))); // NOI18N
+        playPauseButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/route-play.png"))); // NOI18N
         playPauseButton.setText("Play");
-        playPauseButton.setFocusable(false);
+        playPauseButton.setEnabled(false);
         playPauseButton.addActionListener(new java.awt.event.ActionListener()
         {
             public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -115,10 +143,9 @@ public class OptionsPanel extends javax.swing.JPanel
             }
         });
 
-        stopButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/gui/resources/route-stop.png"))); // NOI18N
+        stopButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/route-stop.png"))); // NOI18N
         stopButton.setText("Stop");
         stopButton.setEnabled(false);
-        stopButton.setFocusable(false);
         stopButton.addActionListener(new java.awt.event.ActionListener()
         {
             public void actionPerformed(java.awt.event.ActionEvent evt)

@@ -97,10 +97,10 @@
     <Component class="javax.swing.JButton" name="playPauseButton">
       <Properties>
         <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
-          <Image iconType="3" name="/com/nuwc/interestengine/gui/resources/route-play.png"/>
+          <Image iconType="3" name="/com/nuwc/interestengine/resources/gui/route-play.png"/>
         </Property>
         <Property name="text" type="java.lang.String" value="Play"/>
-        <Property name="focusable" type="boolean" value="false"/>
+        <Property name="enabled" type="boolean" value="false"/>
       </Properties>
       <Events>
         <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="playPauseButtonActionPerformed"/>
@@ -109,11 +109,10 @@
     <Component class="javax.swing.JButton" name="stopButton">
       <Properties>
         <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
-          <Image iconType="3" name="/com/nuwc/interestengine/gui/resources/route-stop.png"/>
+          <Image iconType="3" name="/com/nuwc/interestengine/resources/gui/route-stop.png"/>
         </Property>
         <Property name="text" type="java.lang.String" value="Stop"/>
         <Property name="enabled" type="boolean" value="false"/>
-        <Property name="focusable" type="boolean" value="false"/>
       </Properties>
       <Events>
         <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="stopButtonActionPerformed"/>

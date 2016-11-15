@@ -3,15 +3,17 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.nuwc.interestengine;
+package com.nuwc.interestengine.map;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics2D;
+import java.awt.Image;
 import java.awt.RenderingHints;
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
 import java.util.List;
+import javax.swing.ImageIcon;
 import org.jxmapviewer.JXMapViewer;
 import org.jxmapviewer.painter.Painter;
 import org.jxmapviewer.viewer.GeoPosition;
@@ -23,46 +25,42 @@ import org.jxmapviewer.viewer.GeoPosition;
 public class RoutePainter implements Painter<JXMapViewer>
 {
     private final Color LINE_COLOR = Color.BLACK;
-    private final Color SELECTED_LINE_COLOR = Color.RED;
     private final Color MARKER_COLOR = Color.BLUE;
     private final Color SHIP_COLOR = Color.RED;
-    private final Color START_COLOR = Color.YELLOW;
-    private final Color END_COLOR = Color.GREEN;
-    
-    private final int MARKER_RADIUS = 5;
-    private final int SHIP_RADIUS = 8;
-    
+
+    private final int MARKER_RADIUS = 4;
+
     private List<Ship> ships;
     private Ship selectedShip;
     private Marker selectedMarker;
-    
-    public RoutePainter(List<Ship> builders)
+
+    public RoutePainter(List<Ship> ships)
     {
-        ships = builders;
+        this.ships = ships;
     }
-    
+
     public Ship getSelectedShip()
     {
         return selectedShip;
     }
-    
+
     public Marker getSelectedMarker()
     {
         return selectedMarker;
     }
-    
-    public void setSelected(Ship builder, Marker marker)
+
+    public void setSelected(Ship ship, Marker marker)
     {
-        selectedShip = builder;
+        selectedShip = ship;
         selectedMarker = marker;
-        builder.fireRouteStateChange();
+        ship.fireRouteStateChange();
     }
-    
+
     @Override
     public void paint(Graphics2D g, JXMapViewer map, int i, int i1)
     {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
-                            RenderingHints.VALUE_ANTIALIAS_ON);
+                RenderingHints.VALUE_ANTIALIAS_ON);
         for (Ship ship : ships)
         {
             List<Point2D> mapPoints = new ArrayList<>();
@@ -75,7 +73,8 @@ public class RoutePainter implements Painter<JXMapViewer>
                 {
                     if (ship.isStartMarker(marker))
                     {
-                        paintMarker(g, mapPoint, START_COLOR);
+                        paintSpecial(g, mapPoint,
+                                        getStartMarkerIcon().getImage());
                         if (marker == selectedMarker)
                         {
                             paintMarkerBorder(g, mapPoint, Color.RED);
@@ -83,7 +82,8 @@ public class RoutePainter implements Painter<JXMapViewer>
                     }
                     else if (ship.isEndMarker(marker))
                     {
-                        paintMarker(g, mapPoint, END_COLOR);
+                        paintSpecial(g, mapPoint,
+                                        getEndMarkerIcon().getImage());
                         if (marker == selectedMarker)
                         {
                             paintMarkerBorder(g, mapPoint, Color.RED);
@@ -99,7 +99,7 @@ public class RoutePainter implements Painter<JXMapViewer>
                     }
                 }
             }
-        
+
             if (mapPoints.size() > 1)
             {
                 g.setPaint(LINE_COLOR);
@@ -110,7 +110,6 @@ public class RoutePainter implements Painter<JXMapViewer>
                 else
                 {
                     g.setStroke(new BasicStroke(1));
-
                 }
                 Point2D start = mapPoints.remove(0);
                 while (!mapPoints.isEmpty())
@@ -128,16 +127,37 @@ public class RoutePainter implements Painter<JXMapViewer>
             GeoPosition currentPosition = ship.getCurrentPosition();
             if (currentPosition != null)
             {
-                System.out.println("CURRPOS");
                 Point2D shipPosition = map.convertGeoPositionToPoint(currentPosition);
                 if (g.getClip().contains(shipPosition))
                 {
-                    paintMarker(g, shipPosition, SHIP_COLOR);
+                    paintShip(g, shipPosition, SHIP_COLOR);
                 }
             }
         }
     }
     
+    private ImageIcon getStartMarkerIcon()
+    {
+        String path = "/com/nuwc/interestengine/resources/map/marker-start.png";
+        return new ImageIcon(getClass().getResource(path));
+    }
+    
+    private ImageIcon getEndMarkerIcon()
+    {
+        String path = "/com/nuwc/interestengine/resources/map/marker-end.png";
+        return new ImageIcon(getClass().getResource(path));
+    }
+    
+    private void paintSpecial(final Graphics2D g, final Point2D point,
+                                Image icon)
+    {
+        int x = (int) point.getX();
+        int y = (int) point.getY();
+        int width = icon.getWidth(null);
+        int height = icon.getHeight(null);
+        g.drawImage(icon, x - width / 2, y - height, null);
+    }
+
     private void paintMarker(Graphics2D g, Point2D point, Color color)
     {
         int x = (int) (point.getX() - MARKER_RADIUS);
@@ -147,12 +167,26 @@ public class RoutePainter implements Painter<JXMapViewer>
         g.fillOval(x, y, diameter, diameter);
     }
     
-    private void paintMarkerBorder(Graphics2D g, Point2D point, Color color)
+    private void paintShip(Graphics2D g, Point2D point, Color color)
     {
         int x = (int) (point.getX() - MARKER_RADIUS);
         int y = (int) (point.getY() - MARKER_RADIUS);
         int diameter = MARKER_RADIUS * 2;
         g.setPaint(color);
+        g.fillRect(x, y, diameter, diameter);
+        g.setStroke(new BasicStroke(1));
+        g.setPaint(Color.BLACK);
         g.drawRect(x, y, diameter, diameter);
+    }
+
+    private void paintMarkerBorder(Graphics2D g, Point2D point, Color color)
+    {
+        int x = (int) (point.getX() - MARKER_RADIUS * 2);
+        int y = (int) (point.getY() - MARKER_RADIUS * 2);
+        int diameter = MARKER_RADIUS * 4;
+        g.setPaint(color);
+        g.setStroke(new BasicStroke(2));
+        g.drawRect(x, y, diameter, diameter);
+        g.setStroke(new BasicStroke(1));
     }
 }

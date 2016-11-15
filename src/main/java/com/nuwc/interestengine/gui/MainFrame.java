@@ -3,8 +3,13 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.nuwc.interestengine;
+package com.nuwc.interestengine.gui;
 
+import com.nuwc.interestengine.map.RoutePainter;
+import com.nuwc.interestengine.map.Marker;
+import com.nuwc.interestengine.map.RouteChangeListener;
+import com.nuwc.interestengine.map.Ship;
+import com.nuwc.interestengine.simulation.Simulation;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Point;
@@ -34,7 +39,7 @@ public class MainFrame extends JFrame implements KeyListener
     private static final int MIN_HEIGHT = 600;
     private JXMapKit mapKit;
     private JPanel mapPanel;
-    private JPanel optionsPanel;
+    private OptionsPanel optionsPanel;
     private List<Ship> ships;
     private RoutePainter routePainter;
     private Simulation simulation;
@@ -58,7 +63,11 @@ public class MainFrame extends JFrame implements KeyListener
         setMinimumSize(new Dimension(MIN_WIDTH, MIN_HEIGHT));
         
         initKeyListener();
-        
+        initComponents();
+    }
+    
+    private void initComponents()
+    {
         optionsPanel = new OptionsPanel(getShips(), getSimulation());
         mapPanel = getMap();
         setLayout(new BorderLayout());
@@ -135,7 +144,7 @@ public class MainFrame extends JFrame implements KeyListener
     
     private class MapMouseListener extends MouseAdapter
     {
-        private final double SELECT_THRESH = 8;
+        private final double SELECT_THRESH = 10;
         
         private JXMapKit map;
         private JPopupMenu popup;
@@ -164,13 +173,14 @@ public class MainFrame extends JFrame implements KeyListener
                 }
                 else
                 {
-                    Ship newBuilder = new Ship();
-                    newBuilder.addRouteChangeListener(new RouteListener());
+                    Ship newShip = new Ship();
+                    newShip.addRouteChangeListener(new RouteListener());
                     Marker newMarker = new Marker(mapPoint);
-                    newBuilder.addMarker(newMarker);
-                    ships.add(newBuilder);
-                    routePainter.setSelected(newBuilder, newMarker);
+                    newShip.addMarker(newMarker);
+                    ships.add(newShip);
+                    routePainter.setSelected(newShip, newMarker);
                 }
+                optionsPanel.interruptSimulation();
             }
             else if (SwingUtilities.isRightMouseButton(e))
             {
@@ -193,36 +203,32 @@ public class MainFrame extends JFrame implements KeyListener
                     }
                 }
             }
-            
-            // Print out the # of nodes for each Route Builder.
-            for (Ship builder : ships)
-            {
-                System.out.print(builder.getMarkers().size() + " ");
-            }
-            System.out.println();
         }
         
         @Override
         public void mousePressed(MouseEvent e)
         {
             last = e.getPoint();
-            Point2D clickPoint = new Point(e.getX(), e.getY());
-            FIND: for (Ship ship : ships)
+            if (SwingUtilities.isRightMouseButton(e))
             {
-                for (Marker marker : ship.getMarkers())
+                Point2D clickPoint = new Point(e.getX(), e.getY());
+                FIND: for (Ship ship : ships)
                 {
-                    Point2D point = map.getMainMap()
-                                        .convertGeoPositionToPoint(
-                                        marker.getPosition());
-                    double distance = Point.distance(point.getX(),
-                                                        point.getY(),
-                                                        clickPoint.getX(),
-                                                        clickPoint.getY());
-                    if (distance <= SELECT_THRESH)
+                    for (Marker marker : ship.getMarkers())
                     {
-                        routePainter.setSelected(ship, marker);
-                        dragging = true;
-                        break FIND;
+                        Point2D point = map.getMainMap()
+                                            .convertGeoPositionToPoint(
+                                            marker.getPosition());
+                        double distance = Point.distance(point.getX(),
+                                                            point.getY(),
+                                                            clickPoint.getX(),
+                                                            clickPoint.getY());
+                        if (distance <= SELECT_THRESH)
+                        {
+                            routePainter.setSelected(ship, marker);
+                            dragging = true;
+                            break FIND;
+                        }
                     }
                 }
             }
@@ -237,10 +243,11 @@ public class MainFrame extends JFrame implements KeyListener
         
 
         @Override
-        public void mouseDragged(MouseEvent e) {
+        public void mouseDragged(MouseEvent e)
+        {
             int dx = e.getX() - last.x;
             int dy = e.getY() - last.y;
-            if (dragging)
+            if (dragging && SwingUtilities.isRightMouseButton(e))
             {
                 Marker selectedMarker = routePainter.getSelectedMarker();
                 Point2D point = map.getMainMap()
@@ -255,8 +262,18 @@ public class MainFrame extends JFrame implements KeyListener
                 selectedMarker.setLatitude(mapPoint.getLatitude());
                 selectedMarker.setLongitude(mapPoint.getLongitude());
                 routePainter.getSelectedShip().fireRouteStateChange();
+                optionsPanel.interruptSimulation();
             }
             last = e.getPoint();
+        }
+        
+        @Override
+        public void mouseEntered(MouseEvent e)
+        {
+            if (!getMap().hasFocus())
+            {
+                MainFrame.this.requestFocus();
+            }
         }
     }
     
@@ -277,6 +294,7 @@ public class MainFrame extends JFrame implements KeyListener
                 {
                     ships.remove(selectedShip);
                 }
+                optionsPanel.interruptSimulation();
             }
         }
     }

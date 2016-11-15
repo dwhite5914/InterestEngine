@@ -3,15 +3,13 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.nuwc.interestengine;
+package com.nuwc.interestengine.simulation;
 
 /**
  *
  * @author Dan
  */
-public enum RouteState
+public interface SimulationChangeListener
 {
-    PAUSED,
-    RUNNING,
-    STOPPED
+    public void stateChanged();
 }

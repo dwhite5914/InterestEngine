@@ -3,8 +3,9 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.nuwc.interestengine;
+package com.nuwc.interestengine.map;
 
+import com.nuwc.interestengine.Utils;
 import java.util.List;
 import org.jxmapviewer.viewer.GeoPosition;
 
@@ -34,7 +35,6 @@ public class Route
         if (simulator == null)
         {
             simulator = new Thread(new Simulator());
-            simulator.setDaemon(true);
         }
         simulator.start();
         state = RouteState.RUNNING;
@@ -43,7 +43,6 @@ public class Route
     public void stop()
     {
         state = RouteState.STOPPED;
-        ship.fireRouteStateChange();
     }
     
     public void pause()
