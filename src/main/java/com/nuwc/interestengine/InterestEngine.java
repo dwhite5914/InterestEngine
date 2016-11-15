@@ -14,7 +14,7 @@ import com.nuwc.interestengine.gui.MainFrame;
 public class InterestEngine
 {
     public static void main(String args[])
-    {        
+    {
         MainFrame mainFrame = new MainFrame();
         mainFrame.setVisible(true);
     }
