@@ -15,6 +15,7 @@ import org.jxmapviewer.viewer.GeoPosition;
  */
 public class Route
 {
+    //Attributes
     private static int REFRESH_TIME = 1000;
     private List<Marker> markers;
     private double speed = 0.02;
@@ -25,6 +26,7 @@ public class Route
     
     public Route(Ship ship, List<Marker> markers)
     {
+        //Assigns designated ship to as this shit with it's selected markers
         this.ship = ship;
         this.markers = markers;
         start();
@@ -34,51 +36,61 @@ public class Route
     {
         if (simulator == null)
         {
+            //Creates new simulator is none exists
             simulator = new Thread(new Simulator());
         }
+        //Starts simluator and changes the state
         simulator.start();
         state = RouteState.RUNNING;
     }
     
     public void stop()
     {
+        //Changes state
         state = RouteState.STOPPED;
     }
     
     public void pause()
     {
+        //Changes state and handles the event
         state = RouteState.PAUSED;
         ship.fireRouteStateChange();
     }
     
     public void unpause()
     {
+        //Changes state and handles the event
         state = RouteState.RUNNING;
         ship.fireRouteStateChange();
     }
     
     public RouteState getState()
     {
+        //Returns route state
         return state;
     }
     
     public double getSpeed()
     {
+        //returns speed of ship
         return speed;
     }
     
     public void setSpeed(double speed)
     {
+        //Sets new speed of ship
         this.speed = speed;
     }
     
     public GeoPosition getCurrentPosition()
     {
+        //Returns Object type Geoposition containing Lat and Long
         return currentPosition;
     }
     
     public void firePositionUpdate(GeoPosition position)
     {
+        //Updates ship position with a new GeoPosition position
         ship.firePositionUpdate(position);
     }
 
@@ -101,6 +113,7 @@ public class Route
         @Override
         public void run()
         {
+            //Checks if Start and End exists
             if (markers.size() < 2)
             {
                 return;
