@@ -10,9 +10,14 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.RenderingHints;
+import java.awt.geom.AffineTransform;
 import java.awt.geom.Point2D;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
 import org.jxmapviewer.JXMapViewer;
 import org.jxmapviewer.painter.Painter;
@@ -33,10 +38,12 @@ public class RoutePainter implements Painter<JXMapViewer>
     private List<Ship> ships;
     private Ship selectedShip;
     private Marker selectedMarker;
+    private List<TriMarker> markers;
 
-    public RoutePainter(List<Ship> ships)
+    public RoutePainter(List<Ship> ships, List<TriMarker> markers)
     {
         this.ships = ships;
+        this.markers = markers;
     }
 
     public Ship getSelectedShip()
@@ -61,6 +68,15 @@ public class RoutePainter implements Painter<JXMapViewer>
     {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                 RenderingHints.VALUE_ANTIALIAS_ON);
+        for (TriMarker marker : markers)
+        {
+            GeoPosition position = marker.getPosition();
+            Point2D mapPoint = map.convertGeoPositionToPoint(position);
+            if (g.getClip().contains(mapPoint))
+            {
+                paintTriMarker(g, mapPoint, marker.getCog(), getTriMarkerBI());
+            }
+        }
         for (Ship ship : ships)
         {
             List<Point2D> mapPoints = new ArrayList<>();
@@ -74,7 +90,7 @@ public class RoutePainter implements Painter<JXMapViewer>
                     if (ship.isStartMarker(marker))
                     {
                         paintSpecial(g, mapPoint,
-                                        getStartMarkerIcon().getImage());
+                                getStartMarkerIcon().getImage());
                         if (marker == selectedMarker)
                         {
                             paintMarkerBorder(g, mapPoint, Color.RED);
@@ -83,7 +99,7 @@ public class RoutePainter implements Painter<JXMapViewer>
                     else if (ship.isEndMarker(marker))
                     {
                         paintSpecial(g, mapPoint,
-                                        getEndMarkerIcon().getImage());
+                                getEndMarkerIcon().getImage());
                         if (marker == selectedMarker)
                         {
                             paintMarkerBorder(g, mapPoint, Color.RED);
@@ -135,21 +151,34 @@ public class RoutePainter implements Painter<JXMapViewer>
             }
         }
     }
-    
+
     private ImageIcon getStartMarkerIcon()
     {
         String path = "/com/nuwc/interestengine/resources/map/marker-start.png";
         return new ImageIcon(getClass().getResource(path));
     }
-    
+
     private ImageIcon getEndMarkerIcon()
     {
         String path = "/com/nuwc/interestengine/resources/map/marker-end.png";
         return new ImageIcon(getClass().getResource(path));
     }
-    
+
+    private BufferedImage getTriMarkerBI()
+    {
+        String path = "/com/nuwc/interestengine/resources/map/marker-tri.png";
+        try
+        {
+            return ImageIO.read(new File(getClass().getResource(path).getPath()));
+        }
+        catch (IOException ex)
+        {
+            return null;
+        }
+    }
+
     private void paintSpecial(final Graphics2D g, final Point2D point,
-                                Image icon)
+            Image icon)
     {
         int x = (int) point.getX();
         int y = (int) point.getY();
@@ -166,7 +195,22 @@ public class RoutePainter implements Painter<JXMapViewer>
         g.setPaint(color);
         g.fillOval(x, y, diameter, diameter);
     }
-    
+
+    private void paintTriMarker(Graphics2D g, Point2D point, double cog, BufferedImage bi)
+    {
+        int x = (int) point.getX();
+        int y = (int) point.getY();
+        int width = bi.getWidth();
+        int height = bi.getHeight();
+        double rotation = Math.toRadians(cog);
+        AffineTransform originalTransform = g.getTransform();
+        AffineTransform transform = new AffineTransform();
+        transform.rotate(rotation, x, y);
+        g.setTransform(transform);
+        g.drawImage(bi, x - width / 2, y - height / 2, null);
+        g.setTransform(originalTransform);
+    }
+
     private void paintShip(Graphics2D g, Point2D point, Color color)
     {
         int x = (int) (point.getX() - MARKER_RADIUS);

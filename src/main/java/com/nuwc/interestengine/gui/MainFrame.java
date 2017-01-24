@@ -9,6 +9,7 @@ import com.nuwc.interestengine.map.RoutePainter;
 import com.nuwc.interestengine.map.Marker;
 import com.nuwc.interestengine.map.RouteChangeListener;
 import com.nuwc.interestengine.map.Ship;
+import com.nuwc.interestengine.map.TriMarker;
 import com.nuwc.interestengine.simulation.Simulation;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
@@ -44,12 +45,13 @@ public class MainFrame extends JFrame implements KeyListener
     private List<Ship> ships;
     private RoutePainter routePainter;
     private Simulation simulation;
-    
+    private List<TriMarker> markers;
+
     public MainFrame()
     {
         // Calls parent class constructor
         super();
-        
+
         try
         {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
@@ -59,35 +61,39 @@ public class MainFrame extends JFrame implements KeyListener
         {
             System.out.println("Look and feel not found.");
         }
-        
+
+        initSettings();
+        initKeyListener();
+        initComponents();
+    }
+
+    private void initSettings()
+    {
         // Sets window title, dimensions, and close operation
         setTitle("Contact of Interest Engine");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setMinimumSize(new Dimension(MIN_WIDTH, MIN_HEIGHT));
-        
-        initKeyListener();
-        initComponents();
     }
-    
+
     private void initComponents()
     {
         /* Initialize options panel with ship list and initial
          * simulation state of stopped.
          */
-        optionsPanel = new OptionsPanel(getShips(), getSimulation());
+        optionsPanel = new OptionsPanel(getShips(), getSimulation(), getMarkers(), this);
         mapPanel = getMap();
         setLayout(new BorderLayout());
         add(mapPanel, BorderLayout.CENTER);
         add(optionsPanel, BorderLayout.EAST);
     }
-    
+
     private void initKeyListener()
     {
         addKeyListener(this);
         setFocusable(true);
         setFocusTraversalKeysEnabled(false);
     }
-    
+
     private JXMapKit getMap()
     {
         // If no instance of JXMapKit exists, create one
@@ -100,21 +106,21 @@ public class MainFrame extends JFrame implements KeyListener
             mapKit.getMainMap().addMouseListener(mapMouseListener);
             mapKit.getMainMap().addMouseMotionListener(mapMouseListener);
         }
-        
+
         return mapKit;
     }
-    
+
     private RoutePainter getRoutePainter()
     {
         // If no instance of RoutePainter exists, create one
         if (routePainter == null)
         {
-            routePainter = new RoutePainter(getShips());
+            routePainter = new RoutePainter(getShips(), getMarkers());
         }
-        
+
         return routePainter;
     }
-    
+
     private List<Ship> getShips()
     {
         // If no ship list exists, create one
@@ -122,10 +128,20 @@ public class MainFrame extends JFrame implements KeyListener
         {
             ships = new ArrayList<>();
         }
-        
+
         return ships;
     }
-    
+
+    private List<TriMarker> getMarkers()
+    {
+        if (markers == null)
+        {
+            markers = new ArrayList<>();
+        }
+
+        return markers;
+    }
+
     private Simulation getSimulation()
     {
         // If no Simulation exists, create one
@@ -133,10 +149,15 @@ public class MainFrame extends JFrame implements KeyListener
         {
             simulation = new Simulation(getShips());
         }
-        
+
         return simulation;
     }
-    
+
+    public void updateMap()
+    {
+        getMap().repaint();
+    }
+
     private class RouteListener implements RouteChangeListener
     {
         @Override
@@ -144,39 +165,39 @@ public class MainFrame extends JFrame implements KeyListener
         {
             getMap().repaint();
         }
-        
+
         @Override
         public void routeEnded()
         {
             getSimulation().decShips();
         }
     }
-    
+
     private class MapMouseListener extends MouseAdapter
     {
         private final double SELECT_THRESH = 10;
-        
+
         private JXMapKit map;
         private JPopupMenu popup;
         private Point last;
         private boolean dragging;
-        
+
         public MapMouseListener(JXMapKit map)
         {
             this.map = map;
             this.dragging = false;
         }
-        
+
         @Override
         public void mouseClicked(MouseEvent e)
         {
             Point2D clickPoint = new Point(e.getX(), e.getY());
             GeoPosition mapPoint = map.getMainMap().
-                                        convertPointToGeoPosition(clickPoint);
+                    convertPointToGeoPosition(clickPoint);
             if (SwingUtilities.isLeftMouseButton(e))
             {
-                Ship selectedShip =
-                        routePainter.getSelectedShip();
+                Ship selectedShip
+                        = routePainter.getSelectedShip();
                 if (e.isShiftDown() && selectedShip != null)
                 {
                     selectedShip.addMarker(new Marker(mapPoint));
@@ -194,17 +215,18 @@ public class MainFrame extends JFrame implements KeyListener
             }
             else if (SwingUtilities.isRightMouseButton(e))
             {
-                FIND: for (Ship ship : ships)
+                FIND:
+                for (Ship ship : ships)
                 {
                     for (Marker marker : ship.getMarkers())
                     {
                         Point2D point = map.getMainMap()
-                                            .convertGeoPositionToPoint(
-                                            marker.getPosition());
+                                .convertGeoPositionToPoint(
+                                        marker.getPosition());
                         double distance = Point.distance(point.getX(),
-                                                            point.getY(),
-                                                            clickPoint.getX(),
-                                                            clickPoint.getY());
+                                point.getY(),
+                                clickPoint.getX(),
+                                clickPoint.getY());
                         if (distance <= SELECT_THRESH)
                         {
                             routePainter.setSelected(ship, marker);
@@ -214,7 +236,7 @@ public class MainFrame extends JFrame implements KeyListener
                 }
             }
         }
-        
+
         @Override
         public void mousePressed(MouseEvent e)
         {
@@ -222,17 +244,18 @@ public class MainFrame extends JFrame implements KeyListener
             if (SwingUtilities.isRightMouseButton(e))
             {
                 Point2D clickPoint = new Point(e.getX(), e.getY());
-                FIND: for (Ship ship : ships)
+                FIND:
+                for (Ship ship : ships)
                 {
                     for (Marker marker : ship.getMarkers())
                     {
                         Point2D point = map.getMainMap()
-                                            .convertGeoPositionToPoint(
-                                            marker.getPosition());
+                                .convertGeoPositionToPoint(
+                                        marker.getPosition());
                         double distance = Point.distance(point.getX(),
-                                                            point.getY(),
-                                                            clickPoint.getX(),
-                                                            clickPoint.getY());
+                                point.getY(),
+                                clickPoint.getX(),
+                                clickPoint.getY());
                         if (distance <= SELECT_THRESH)
                         {
                             routePainter.setSelected(ship, marker);
@@ -243,14 +266,13 @@ public class MainFrame extends JFrame implements KeyListener
                 }
             }
         }
-        
+
         @Override
         public void mouseReleased(MouseEvent e)
         {
             dragging = false;
             last = null;
         }
-        
 
         @Override
         public void mouseDragged(MouseEvent e)
@@ -261,13 +283,13 @@ public class MainFrame extends JFrame implements KeyListener
             {
                 Marker selectedMarker = routePainter.getSelectedMarker();
                 Point2D point = map.getMainMap()
-                                    .convertGeoPositionToPoint(
-                                    selectedMarker.getPosition());
+                        .convertGeoPositionToPoint(
+                                selectedMarker.getPosition());
                 point.setLocation(point.getX() + dx, point.getY() + dy);
                 point.setLocation(Math.max(5, point.getX()),
-                                    Math.max(5, point.getY()));
+                        Math.max(5, point.getY()));
                 point.setLocation(Math.min(point.getX(), mapKit.getWidth() - 5),
-                                    Math.min(point.getY(), mapKit.getHeight() - 5));
+                        Math.min(point.getY(), mapKit.getHeight() - 5));
                 GeoPosition mapPoint = map.getMainMap().convertPointToGeoPosition(point);
                 selectedMarker.setLatitude(mapPoint.getLatitude());
                 selectedMarker.setLongitude(mapPoint.getLongitude());
@@ -276,7 +298,7 @@ public class MainFrame extends JFrame implements KeyListener
             }
             last = e.getPoint();
         }
-        
+
         @Override
         public void mouseEntered(MouseEvent e)
         {
@@ -286,19 +308,19 @@ public class MainFrame extends JFrame implements KeyListener
             }
         }
     }
-    
+
     @Override
     public void keyPressed(KeyEvent e)
     {
         int key = e.getKeyCode();
 
-        if(key == KeyEvent.VK_DELETE || key == KeyEvent.VK_BACK_SPACE)
+        if (key == KeyEvent.VK_DELETE || key == KeyEvent.VK_BACK_SPACE)
         {
             Marker selectedMarker = routePainter.getSelectedMarker();
             if (selectedMarker != null)
             {
-                Ship selectedShip =
-                        routePainter.getSelectedShip();
+                Ship selectedShip
+                        = routePainter.getSelectedShip();
                 selectedShip.removeMarker(selectedMarker);
                 if (selectedShip.getMarkers().isEmpty())
                 {
@@ -308,10 +330,14 @@ public class MainFrame extends JFrame implements KeyListener
             }
         }
     }
-    
+
     @Override
-    public void keyReleased(KeyEvent e) {}
-    
+    public void keyReleased(KeyEvent e)
+    {
+    }
+
     @Override
-    public void keyTyped(KeyEvent e) {}
+    public void keyTyped(KeyEvent e)
+    {
+    }
 }

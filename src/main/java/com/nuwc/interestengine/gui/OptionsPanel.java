@@ -5,12 +5,16 @@
  */
 package com.nuwc.interestengine.gui;
 
+import com.nuwc.parser.NMEAParser;
 import com.nuwc.interestengine.map.Ship;
+import com.nuwc.interestengine.map.TriMarker;
 import com.nuwc.interestengine.simulation.Simulation;
 import com.nuwc.interestengine.simulation.SimulationChangeListener;
 import com.nuwc.interestengine.simulation.SimulationState;
+import java.io.File;
 import java.util.List;
 import javax.swing.ImageIcon;
+import javax.swing.JFileChooser;
 
 /**
  *
@@ -20,49 +24,53 @@ public class OptionsPanel extends javax.swing.JPanel
 {
     private List<Ship> ships;
     private Simulation simulation;
-    
-    public OptionsPanel(List<Ship> ships, Simulation simulation)
+    private List<TriMarker> markers;
+    private MainFrame mainFrame;
+
+    public OptionsPanel(List<Ship> ships, Simulation simulation, List<TriMarker> markers, MainFrame mainFrame)
     {
         this.ships = ships;
         this.simulation = simulation;
-        
+        this.markers = markers;
+        this.mainFrame = mainFrame;
+
         initListeners();
         initComponents();
     }
-    
+
     private void initListeners()
     {
         simulation.addSimulationChangeListener(new StateChangeListener());
     }
-    
+
     private ImageIcon getPlayIcon()
     {
         String path = "/com/nuwc/interestengine/resources/gui/route-play.png";
         return new ImageIcon(getClass().getResource(path));
     }
-    
+
     private ImageIcon getPauseIcon()
     {
         String path = "/com/nuwc/interestengine/resources/gui/route-pause.png";
         return new ImageIcon(getClass().getResource(path));
     }
-    
+
     private ImageIcon getStopIcon()
     {
         String path = "/com/nuwc/interestengine/resources/gui/route-stop.png";
         return new ImageIcon(getClass().getResource(path));
     }
-    
+
     public void interruptSimulation()
     {
         if (simulation.getState() != SimulationState.STOPPED)
         {
             simulation.stop();
         }
-        
+
         updatePanel();
     }
-    
+
     public synchronized void updatePanel()
     {
         SimulationState state = simulation.getState();
@@ -95,11 +103,13 @@ public class OptionsPanel extends javax.swing.JPanel
             playPauseButton.setEnabled(true);
         }
     }
-    
+
     private class StateChangeListener implements SimulationChangeListener
     {
-        public StateChangeListener() {}
-        
+        public StateChangeListener()
+        {
+        }
+
         @Override
         public void stateChanged()
         {
@@ -123,6 +133,7 @@ public class OptionsPanel extends javax.swing.JPanel
         typeComboBox = new javax.swing.JComboBox();
         playPauseButton = new javax.swing.JButton();
         stopButton = new javax.swing.JButton();
+        jButton1 = new javax.swing.JButton();
 
         nameLabel.setText("Name:");
 
@@ -154,6 +165,15 @@ public class OptionsPanel extends javax.swing.JPanel
             }
         });
 
+        jButton1.setText("Load Data");
+        jButton1.addActionListener(new java.awt.event.ActionListener()
+        {
+            public void actionPerformed(java.awt.event.ActionEvent evt)
+            {
+                jButton1ActionPerformed(evt);
+            }
+        });
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(this);
         this.setLayout(layout);
         layout.setHorizontalGroup(
@@ -170,7 +190,9 @@ public class OptionsPanel extends javax.swing.JPanel
                             .addComponent(typeComboBox, 0, 200, Short.MAX_VALUE)
                             .addComponent(nameTextField)))
                     .addGroup(layout.createSequentialGroup()
-                        .addComponent(playPauseButton, javax.swing.GroupLayout.PREFERRED_SIZE, 130, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
+                            .addComponent(jButton1, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                            .addComponent(playPauseButton, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, 130, Short.MAX_VALUE))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(stopButton, javax.swing.GroupLayout.PREFERRED_SIZE, 130, javax.swing.GroupLayout.PREFERRED_SIZE)))
                 .addContainerGap(11, Short.MAX_VALUE))
@@ -190,7 +212,9 @@ public class OptionsPanel extends javax.swing.JPanel
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(playPauseButton)
                     .addComponent(stopButton))
-                .addContainerGap(489, Short.MAX_VALUE))
+                .addGap(79, 79, 79)
+                .addComponent(jButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 41, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(369, Short.MAX_VALUE))
         );
     }// </editor-fold>//GEN-END:initComponents
 
@@ -232,7 +256,23 @@ public class OptionsPanel extends javax.swing.JPanel
         }
     }//GEN-LAST:event_stopButtonActionPerformed
 
+    private void jButton1ActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_jButton1ActionPerformed
+    {//GEN-HEADEREND:event_jButton1ActionPerformed
+        JFileChooser fileChooser = new JFileChooser();
+        int returnValue = fileChooser.showOpenDialog(this);
+
+        if (returnValue == JFileChooser.APPROVE_OPTION)
+        {
+            File file = fileChooser.getSelectedFile();
+            String path = file.getAbsolutePath();
+            NMEAParser parser = new NMEAParser(path, markers);
+            parser.parse();
+            mainFrame.updateMap();
+        }
+    }//GEN-LAST:event_jButton1ActionPerformed
+
     // Variables declaration - do not modify//GEN-BEGIN:variables
+    private javax.swing.JButton jButton1;
     private javax.swing.JLabel nameLabel;
     private javax.swing.JTextField nameTextField;
     private javax.swing.JButton playPauseButton;
