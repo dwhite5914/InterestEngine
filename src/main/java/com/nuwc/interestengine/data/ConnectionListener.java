@@ -1,4 +1,4 @@
-package com.nuwc.data;
+package com.nuwc.interestengine.data;
 
 public interface ConnectionListener
 {

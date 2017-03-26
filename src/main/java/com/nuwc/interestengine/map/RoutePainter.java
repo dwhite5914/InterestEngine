@@ -1,8 +1,8 @@
 package com.nuwc.interestengine.map;
 
-import com.nuwc.clustering.Cluster;
-import com.nuwc.clustering.RouteObject;
-import com.nuwc.data.AISPoint;
+import com.nuwc.interestengine.clustering.Cluster;
+import com.nuwc.interestengine.clustering.RouteObject;
+import com.nuwc.interestengine.data.AISPoint;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;

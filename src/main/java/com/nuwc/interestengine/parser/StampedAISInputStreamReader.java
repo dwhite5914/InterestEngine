@@ -1,4 +1,4 @@
-package com.nuwc.parser;
+package com.nuwc.interestengine.parser;
 
 import java.io.IOException;
 import java.io.InputStream;

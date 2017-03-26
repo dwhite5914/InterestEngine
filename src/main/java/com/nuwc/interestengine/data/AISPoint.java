@@ -1,6 +1,6 @@
-package com.nuwc.data;
+package com.nuwc.interestengine.data;
 
-import com.nuwc.clustering.Cluster;
+import com.nuwc.interestengine.clustering.Cluster;
 import java.util.ArrayList;
 import java.util.List;
 

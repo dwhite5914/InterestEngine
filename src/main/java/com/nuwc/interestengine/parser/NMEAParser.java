@@ -1,9 +1,9 @@
-package com.nuwc.parser;
+package com.nuwc.interestengine.parser;
 
-import com.nuwc.clustering.Vessel;
-import com.nuwc.data.AISPoint;
-import com.nuwc.data.DataPoint;
-import com.nuwc.data.Database;
+import com.nuwc.interestengine.clustering.Vessel;
+import com.nuwc.interestengine.data.AISPoint;
+import com.nuwc.interestengine.data.DataPoint;
+import com.nuwc.interestengine.data.Database;
 import com.nuwc.interestengine.map.TriMarker;
 import dk.tbsalling.aismessages.ais.messages.AISMessage;
 import dk.tbsalling.aismessages.ais.messages.DynamicDataReport;

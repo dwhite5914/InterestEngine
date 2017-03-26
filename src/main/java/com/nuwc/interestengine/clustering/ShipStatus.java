@@ -1,4 +1,4 @@
-package com.nuwc.clustering;
+package com.nuwc.interestengine.clustering;
 
 public enum ShipStatus
 {

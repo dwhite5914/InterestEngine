@@ -1,6 +1,6 @@
-package com.nuwc.clustering;
+package com.nuwc.interestengine.clustering;
 
-import com.nuwc.data.AISPoint;
+import com.nuwc.interestengine.data.AISPoint;
 import java.awt.Color;
 import java.util.ArrayList;
 import java.util.List;

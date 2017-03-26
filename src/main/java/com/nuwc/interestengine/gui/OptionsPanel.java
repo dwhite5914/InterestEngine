@@ -1,9 +1,9 @@
 package com.nuwc.interestengine.gui;
 
-import com.nuwc.data.Database;
-import com.nuwc.clustering.RouteExtractor;
+import com.nuwc.interestengine.data.Database;
+import com.nuwc.interestengine.clustering.RouteExtractor;
 import com.nuwc.interestengine.map.RoutePainter;
-import com.nuwc.parser.NMEAParser;
+import com.nuwc.interestengine.parser.NMEAParser;
 import com.nuwc.interestengine.map.Ship;
 import com.nuwc.interestengine.map.TriMarker;
 import com.nuwc.interestengine.simulation.Simulation;

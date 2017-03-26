@@ -1,7 +1,7 @@
 package com.nuwc.interestengine.gui;
 
-import com.nuwc.clustering.Cluster;
-import com.nuwc.clustering.RouteObject;
+import com.nuwc.interestengine.clustering.Cluster;
+import com.nuwc.interestengine.clustering.RouteObject;
 import com.nuwc.interestengine.map.RoutePainter;
 import com.nuwc.interestengine.map.Marker;
 import com.nuwc.interestengine.map.RouteChangeListener;

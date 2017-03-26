@@ -1,4 +1,4 @@
-package com.nuwc.parser;
+package com.nuwc.interestengine.parser;
 
 import dk.tbsalling.aismessages.ais.messages.AISMessage;
 import dk.tbsalling.aismessages.ais.messages.Metadata;

@@ -1,19 +1,19 @@
-package com.nuwc.parser;
+package com.nuwc.interestengine.parser;
 
-import dk.tbsalling.aismessages.nmea.messages.NMEAMessage;
+import dk.tbsalling.aismessages.ais.messages.AISMessage;
 
-public class StampedNMEAMessage
+public class StampedAISMessage
 {
-    private NMEAMessage message;
+    private AISMessage message;
     private long timestamp;
 
-    public StampedNMEAMessage(NMEAMessage message, long timestamp)
+    public StampedAISMessage(AISMessage message, long timestamp)
     {
         this.message = message;
         this.timestamp = timestamp;
     }
 
-    public NMEAMessage getMessage()
+    public AISMessage getMessage()
     {
         return message;
     }
@@ -23,7 +23,7 @@ public class StampedNMEAMessage
         return timestamp;
     }
 
-    public void setMessage(NMEAMessage message)
+    public void setMessage(AISMessage message)
     {
         this.message = message;
     }

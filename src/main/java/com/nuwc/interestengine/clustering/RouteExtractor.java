@@ -1,10 +1,10 @@
-package com.nuwc.clustering;
+package com.nuwc.interestengine.clustering;
 
-import com.nuwc.data.PointType;
-import com.nuwc.data.DataPoint;
-import com.nuwc.data.Database;
+import com.nuwc.interestengine.data.PointType;
+import com.nuwc.interestengine.data.DataPoint;
+import com.nuwc.interestengine.data.Database;
 import com.nuwc.interestengine.gui.MainFrame;
-import com.nuwc.data.AISPoint;
+import com.nuwc.interestengine.data.AISPoint;
 import com.nuwc.interestengine.map.RoutePainter;
 import java.awt.Color;
 import java.awt.Point;

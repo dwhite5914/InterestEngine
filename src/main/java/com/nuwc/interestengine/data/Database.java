@@ -1,4 +1,4 @@
-package com.nuwc.data;
+package com.nuwc.interestengine.data;
 
 import com.nuwc.interestengine.Utils;
 import java.io.File;
