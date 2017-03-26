@@ -1,20 +1,25 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package com.nuwc.interestengine;
 
 import com.nuwc.interestengine.gui.MainFrame;
+import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
 
-/**
- *
- * @author Dan
- */
 public class InterestEngine
 {
     public static void main(String args[])
     {
+        // Set look and feel.
+        try
+        {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        }
+        catch (ClassNotFoundException | InstantiationException
+                | IllegalAccessException | UnsupportedLookAndFeelException e)
+        {
+            System.out.println("Look and feel not found.");
+        }
+
+        // Initialize mainframe for application.
         MainFrame mainFrame = new MainFrame();
         mainFrame.setVisible(true);
     }

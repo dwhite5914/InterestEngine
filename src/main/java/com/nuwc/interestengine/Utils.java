@@ -1,25 +1,56 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package com.nuwc.interestengine;
 
 import com.nuwc.interestengine.map.Marker;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.Properties;
 import org.jxmapviewer.viewer.GeoPosition;
 
-/**
- *
- * @author Dan
- */
 public final class Utils
 {
     private Utils()
     {
         // Just a function library.
+    }
+    
+    public static void updateProps(Properties props)
+    {
+        String path = Utils.getResource("config/config.properties");
+        OutputStream os = null;
+        try
+        {
+            os = new FileOutputStream(path);
+        }
+        catch (FileNotFoundException e)
+        {
+            System.out.println("Failed to find config file.");
+        }
+        
+        try
+        {
+            props.store(os, null);
+        }
+        catch (IOException ex)
+        {
+            System.out.println("Failed to update properties.");
+        }
+    }
+
+    public static void delay(long millis)
+    {
+        try
+        {
+            Thread.sleep(millis);
+        }
+        catch (InterruptedException e)
+        {
+            // Pass.
+        }
     }
 
     public static double distance(GeoPosition p1, GeoPosition p2)

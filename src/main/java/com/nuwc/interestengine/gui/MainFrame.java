@@ -1,10 +1,7 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package com.nuwc.interestengine.gui;
 
+import com.nuwc.clustering.Cluster;
+import com.nuwc.clustering.RouteObject;
 import com.nuwc.interestengine.map.RoutePainter;
 import com.nuwc.interestengine.map.Marker;
 import com.nuwc.interestengine.map.RouteChangeListener;
@@ -30,15 +27,11 @@ import javax.swing.UnsupportedLookAndFeelException;
 import org.jxmapviewer.JXMapKit;
 import org.jxmapviewer.viewer.GeoPosition;
 
-/**
- *
- * @author Dan
- */
 public class MainFrame extends JFrame implements KeyListener
 {
     // Attributes
-    private static final int MIN_WIDTH = 800;
-    private static final int MIN_HEIGHT = 600;
+    private static final int MIN_WIDTH = 1200;
+    private static final int MIN_HEIGHT = 800;
     private JXMapKit mapKit;
     private JPanel mapPanel;
     private OptionsPanel optionsPanel;
@@ -80,7 +73,8 @@ public class MainFrame extends JFrame implements KeyListener
         /* Initialize options panel with ship list and initial
          * simulation state of stopped.
          */
-        optionsPanel = new OptionsPanel(getShips(), getSimulation(), getMarkers(), this);
+        optionsPanel = new OptionsPanel(getShips(), getSimulation(),
+                getMarkers(), getRoutePainter(getMap()), this);
         mapPanel = getMap();
         setLayout(new BorderLayout());
         add(mapPanel, BorderLayout.CENTER);
@@ -101,21 +95,23 @@ public class MainFrame extends JFrame implements KeyListener
         {
             mapKit = new JXMapKit();
             mapKit.setDefaultProvider(JXMapKit.DefaultProviders.OpenStreetMaps);
-            mapKit.getMainMap().setOverlayPainter(getRoutePainter());
+            mapKit.getMainMap().setOverlayPainter(getRoutePainter(mapKit));
             MapMouseListener mapMouseListener = new MapMouseListener(mapKit);
             mapKit.getMainMap().addMouseListener(mapMouseListener);
             mapKit.getMainMap().addMouseMotionListener(mapMouseListener);
+            mapKit.setCenterPosition(new GeoPosition(44, 15));
+            mapKit.setZoom(12);
         }
 
         return mapKit;
     }
 
-    private RoutePainter getRoutePainter()
+    private RoutePainter getRoutePainter(JXMapKit map)
     {
         // If no instance of RoutePainter exists, create one
         if (routePainter == null)
         {
-            routePainter = new RoutePainter(getShips(), getMarkers());
+            routePainter = new RoutePainter(getShips(), getMarkers(), map);
         }
 
         return routePainter;

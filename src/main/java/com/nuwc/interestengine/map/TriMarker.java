@@ -1,17 +1,8 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package com.nuwc.interestengine.map;
 
 import org.jxmapviewer.viewer.GeoPosition;
 import org.jxmapviewer.viewer.Waypoint;
 
-/**
- *
- * @author Dan
- */
 public class TriMarker implements Waypoint
 {
     private GeoPosition position;
