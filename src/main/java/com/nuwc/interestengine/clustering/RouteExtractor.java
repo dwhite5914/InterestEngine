@@ -9,6 +9,7 @@ import com.nuwc.interestengine.map.RoutePainter;
 import java.awt.Color;
 import java.awt.Point;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
@@ -99,7 +100,7 @@ public class RouteExtractor
         return routes.size();
     }
 
-    public void run()
+    public List<RouteObject> run()
     {
         // Load data from database.
         System.out.println("Loading from Database...");
@@ -114,6 +115,7 @@ public class RouteExtractor
             DataPoint point = points.get(i);
             AISPoint aisPoint = new AISPoint(point.lat, point.lon,
                     point.sog, point.cog, point.timestamp);
+            aisPoint.shipType = point.shipType;
             aisPoints.add(aisPoint);
 
             extractRoutes(point.mmsi, aisPoint, point.shipType, points, i);
@@ -157,6 +159,27 @@ public class RouteExtractor
         painter.setStopPoints(stopPoints);
 
         System.out.println("Route Extraction 2 Complete.");
+
+        List<RouteObject> routesForTraining = new ArrayList<>();
+        for (RouteObject route : routes.values())
+        {
+            if (route.points.size() > 300)
+            {
+                RouteObject newRoute = new RouteObject();
+                int numOver = route.points.size() - 300;
+                List<AISPoint> newPoints = new ArrayList<>(route.points);
+                Collections.shuffle(newPoints);
+                newRoute.points
+                        = newPoints.subList(0, newPoints.size() - numOver + 1);
+                routesForTraining.add(newRoute);
+            }
+            else if (route.points.size() > 100)
+            {
+                routesForTraining.add(route);
+            }
+        }
+
+        return routesForTraining;
     }
 
     private void extractRoutes(int mmsi, AISPoint point, String shipType,

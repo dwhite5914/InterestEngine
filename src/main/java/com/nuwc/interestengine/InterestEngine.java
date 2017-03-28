@@ -19,6 +19,8 @@ public class InterestEngine
             System.out.println("Look and feel not found.");
         }
 
+        System.setProperty("hadoop.home.dir", "C:\\winutils\\");
+
         // Initialize mainframe for application.
         MainFrame mainFrame = new MainFrame();
         mainFrame.setVisible(true);

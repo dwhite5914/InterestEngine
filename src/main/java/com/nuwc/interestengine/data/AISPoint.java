@@ -11,6 +11,7 @@ public class AISPoint
     public float lon;
     public float sog;
     public float cog;
+    public String shipType;
     public long timestamp;
     public boolean isVisited;
     public PointType type;

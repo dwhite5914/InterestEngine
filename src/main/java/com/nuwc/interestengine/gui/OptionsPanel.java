@@ -2,10 +2,12 @@ package com.nuwc.interestengine.gui;
 
 import com.nuwc.interestengine.data.Database;
 import com.nuwc.interestengine.clustering.RouteExtractor;
+import com.nuwc.interestengine.clustering.RouteObject;
 import com.nuwc.interestengine.map.RoutePainter;
 import com.nuwc.interestengine.parser.NMEAParser;
 import com.nuwc.interestengine.map.Ship;
 import com.nuwc.interestengine.map.TriMarker;
+import com.nuwc.interestengine.neuralnet.NeuralNet;
 import com.nuwc.interestengine.simulation.Simulation;
 import com.nuwc.interestengine.simulation.SimulationChangeListener;
 import com.nuwc.interestengine.simulation.SimulationState;
@@ -44,6 +46,9 @@ public class OptionsPanel extends javax.swing.JPanel
     private Color colorEntryPoints = null;
     private Color colorExitPoints = null;
     private Color colorStopPoints = null;
+
+    private List<RouteObject> routes = null;
+    private NeuralNet network = null;
 
     public OptionsPanel(List<Ship> ships, Simulation simulation,
             List<TriMarker> markers, RoutePainter painter, MainFrame mainFrame)
@@ -306,6 +311,9 @@ public class OptionsPanel extends javax.swing.JPanel
         colorStopPointsBox = new javax.swing.JPanel();
         clustersModeCombo = new javax.swing.JComboBox<>();
         routesModeCombo = new javax.swing.JComboBox<>();
+        jPanel1 = new javax.swing.JPanel();
+        trainNetworkButton = new javax.swing.JButton();
+        trainNetworkButton1 = new javax.swing.JButton();
 
         setPreferredSize(new java.awt.Dimension(500, 800));
 
@@ -830,7 +838,7 @@ public class OptionsPanel extends javax.swing.JPanel
         );
         colorRoutesBoxLayout.setVerticalGroup(
             colorRoutesBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 20, Short.MAX_VALUE)
+            .addGap(0, 0, Short.MAX_VALUE)
         );
 
         colorDataPointsBox.setBorder(javax.swing.BorderFactory.createEtchedBorder());
@@ -843,7 +851,7 @@ public class OptionsPanel extends javax.swing.JPanel
         );
         colorDataPointsBoxLayout.setVerticalGroup(
             colorDataPointsBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 20, Short.MAX_VALUE)
+            .addGap(0, 0, Short.MAX_VALUE)
         );
 
         colorEntryPointsBox.setBorder(javax.swing.BorderFactory.createEtchedBorder());
@@ -856,7 +864,7 @@ public class OptionsPanel extends javax.swing.JPanel
         );
         colorEntryPointsBoxLayout.setVerticalGroup(
             colorEntryPointsBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 20, Short.MAX_VALUE)
+            .addGap(0, 21, Short.MAX_VALUE)
         );
 
         colorExitPointsBox.setBorder(javax.swing.BorderFactory.createEtchedBorder());
@@ -969,7 +977,7 @@ public class OptionsPanel extends javax.swing.JPanel
                                         .addComponent(drawRoutesBox)
                                         .addComponent(colorRoutesButton))
                                     .addComponent(routesModeCombo, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                                .addGap(0, 0, Short.MAX_VALUE)))
+                                .addGap(0, 4, Short.MAX_VALUE)))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(colorDataPointsBox, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
@@ -977,7 +985,7 @@ public class OptionsPanel extends javax.swing.JPanel
                                 .addGroup(displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                                     .addComponent(drawDataPointsBox)
                                     .addComponent(colorDataPointsButton))
-                                .addGap(0, 0, Short.MAX_VALUE)))
+                                .addGap(0, 4, Short.MAX_VALUE)))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(colorEntryPointsBox, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
@@ -996,7 +1004,49 @@ public class OptionsPanel extends javax.swing.JPanel
                         .addComponent(drawStopPointsBox)
                         .addComponent(colorStopPointsButton))
                     .addComponent(colorStopPointsBox, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addGap(122, 122, 122))
+                .addGap(31, 31, 31))
+        );
+
+        jPanel1.setBorder(javax.swing.BorderFactory.createTitledBorder("Neural Network"));
+
+        trainNetworkButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/convert_icon.png"))); // NOI18N
+        trainNetworkButton.setText("Train Network");
+        trainNetworkButton.addActionListener(new java.awt.event.ActionListener()
+        {
+            public void actionPerformed(java.awt.event.ActionEvent evt)
+            {
+                trainNetworkButtonActionPerformed(evt);
+            }
+        });
+
+        trainNetworkButton1.setText("Test");
+        trainNetworkButton1.addActionListener(new java.awt.event.ActionListener()
+        {
+            public void actionPerformed(java.awt.event.ActionEvent evt)
+            {
+                trainNetworkButton1ActionPerformed(evt);
+            }
+        });
+
+        javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
+        jPanel1.setLayout(jPanel1Layout);
+        jPanel1Layout.setHorizontalGroup(
+            jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel1Layout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(trainNetworkButton)
+                .addGap(18, 18, 18)
+                .addComponent(trainNetworkButton1)
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+        );
+        jPanel1Layout.setVerticalGroup(
+            jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel1Layout.createSequentialGroup()
+                .addContainerGap()
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(trainNetworkButton, javax.swing.GroupLayout.PREFERRED_SIZE, 41, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(trainNetworkButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 41, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         javax.swing.GroupLayout mainScrollerPanelLayout = new javax.swing.GroupLayout(mainScrollerPanel);
@@ -1006,6 +1056,7 @@ public class OptionsPanel extends javax.swing.JPanel
             .addGroup(mainScrollerPanelLayout.createSequentialGroup()
                 .addContainerGap()
                 .addGroup(mainScrollerPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addGroup(mainScrollerPanelLayout.createSequentialGroup()
                         .addComponent(displayPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                         .addContainerGap())
@@ -1022,8 +1073,10 @@ public class OptionsPanel extends javax.swing.JPanel
                 .addComponent(databasePanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(18, 18, 18)
                 .addComponent(analysisPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(displayPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addGap(18, 18, 18)
+                .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addGap(18, 18, 18)
+                .addComponent(displayPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap())
         );
 
@@ -1056,7 +1109,13 @@ public class OptionsPanel extends javax.swing.JPanel
             RouteExtractor extractor = new RouteExtractor(db, painter, mainFrame,
                     lostTime, minSpeed, entryEpsilon, entryMinPoints,
                     exitEpsilon, exitMinPoints, stopEpsilon, stopMinPoints);
-            extractor.run();
+            routes = extractor.run();
+            int n = 0;
+            for (RouteObject route : routes)
+            {
+                n += route.points.size();
+            }
+            System.out.println("# points = " + n);
             numberClustersField.setText("" + extractor.getNumberOfClusters());
             numberRoutesField.setText("" + extractor.getNumberOfRoutes());
         }
@@ -1224,6 +1283,28 @@ public class OptionsPanel extends javax.swing.JPanel
         painter.setRoutesMode((String) routesModeCombo.getSelectedItem());
     }//GEN-LAST:event_routesModeComboActionPerformed
 
+    private void trainNetworkButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_trainNetworkButtonActionPerformed
+    {//GEN-HEADEREND:event_trainNetworkButtonActionPerformed
+        if (routes != null)
+        {
+            for (RouteObject route : routes)
+            {
+                System.out.println(route.points.size());
+            }
+            network = new NeuralNet(5, 40, routes.size(), 10, 350, 0.001, routes);
+            network.train();
+        }
+        System.out.println("***** COMPLETE *****");
+    }//GEN-LAST:event_trainNetworkButtonActionPerformed
+
+    private void trainNetworkButton1ActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_trainNetworkButton1ActionPerformed
+    {//GEN-HEADEREND:event_trainNetworkButton1ActionPerformed
+        if (network != null)
+        {
+            network.test();
+        }
+    }//GEN-LAST:event_trainNetworkButton1ActionPerformed
+
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JPanel AnalysisSettingsPanel;
     private javax.swing.JPanel DatabaseSettingsPanel;
@@ -1259,6 +1340,7 @@ public class OptionsPanel extends javax.swing.JPanel
     private javax.swing.JTextField exitMinPointsField;
     private javax.swing.JLabel exitMinPointsLabel;
     private javax.swing.JButton extractRoutesButton;
+    private javax.swing.JPanel jPanel1;
     private javax.swing.JButton loadDataButton;
     private javax.swing.JTextField lostTimeField;
     private javax.swing.JLabel lostTimeLabel;
@@ -1290,6 +1372,8 @@ public class OptionsPanel extends javax.swing.JPanel
     private javax.swing.JLabel stopEpsilonLabel;
     private javax.swing.JTextField stopMinPointsField;
     private javax.swing.JLabel stopMinPointsLabel;
+    private javax.swing.JButton trainNetworkButton;
+    private javax.swing.JButton trainNetworkButton1;
     private javax.swing.JScrollPane vesselDataScroller;
     private javax.swing.JTable vesselDataTable;
     // End of variables declaration//GEN-END:variables
