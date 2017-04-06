@@ -1291,7 +1291,7 @@ public class OptionsPanel extends javax.swing.JPanel
             {
                 System.out.println(route.points.size());
             }
-            network = new NeuralNet(5, 40, routes.size(), 10, 350, 0.001, routes);
+            network = new NeuralNet(5, 50, routes.size(), 5, 350, 0.01, routes);
             network.train();
         }
         System.out.println("***** COMPLETE *****");
