@@ -1,7 +1,6 @@
 package com.nuwc.interestengine.gui;
 
-import com.nuwc.interestengine.clustering.Cluster;
-import com.nuwc.interestengine.clustering.RouteObject;
+import com.nuwc.interestengine.clustering.Vessel;
 import com.nuwc.interestengine.map.RoutePainter;
 import com.nuwc.interestengine.map.Marker;
 import com.nuwc.interestengine.map.RouteChangeListener;
@@ -192,22 +191,22 @@ public class MainFrame extends JFrame implements KeyListener
                     convertPointToGeoPosition(clickPoint);
             if (SwingUtilities.isLeftMouseButton(e))
             {
-                Ship selectedShip
-                        = routePainter.getSelectedShip();
-                if (e.isShiftDown() && selectedShip != null)
-                {
-                    selectedShip.addMarker(new Marker(mapPoint));
-                }
-                else
-                {
-                    Ship newShip = new Ship();
-                    newShip.addRouteChangeListener(new RouteListener());
-                    Marker newMarker = new Marker(mapPoint);
-                    newShip.addMarker(newMarker);
-                    ships.add(newShip);
-                    routePainter.setSelected(newShip, newMarker);
-                }
-                optionsPanel.interruptSimulation();
+//                Ship selectedShip
+//                        = routePainter.getSelectedShip();
+//                if (e.isShiftDown() && selectedShip != null)
+//                {
+//                    selectedShip.addMarker(new Marker(mapPoint));
+//                }
+//                else
+//                {
+//                    Ship newShip = new Ship();
+//                    newShip.addRouteChangeListener(new RouteListener());
+//                    Marker newMarker = new Marker(mapPoint);
+//                    newShip.addMarker(newMarker);
+//                    ships.add(newShip);
+//                    routePainter.setSelected(newShip, newMarker);
+//                }
+//                optionsPanel.interruptSimulation();
             }
             else if (SwingUtilities.isRightMouseButton(e))
             {
@@ -301,6 +300,32 @@ public class MainFrame extends JFrame implements KeyListener
             if (!getMap().hasFocus())
             {
                 MainFrame.this.requestFocus();
+            }
+        }
+
+        @Override
+        public void mouseMoved(MouseEvent e)
+        {
+            Vessel selectedVessel = routePainter.getSelectedVessel();
+            if (selectedVessel == null)
+            {
+                for (Vessel vessel : routePainter.getVessels())
+                {
+                    if (vessel.contains(e.getPoint()))
+                    {
+                        routePainter.setSelectedVessel(vessel);
+                        updateMap();
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                if (!selectedVessel.contains(e.getPoint()))
+                {
+                    routePainter.setSelectedVessel(null);
+                    updateMap();
+                }
             }
         }
     }

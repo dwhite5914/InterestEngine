@@ -11,11 +11,15 @@ import com.nuwc.interestengine.neuralnet.NeuralNet;
 import com.nuwc.interestengine.simulation.Simulation;
 import com.nuwc.interestengine.simulation.SimulationChangeListener;
 import com.nuwc.interestengine.simulation.SimulationState;
+import com.nuwc.interestengine.simulator.MessageConsumer;
+import com.nuwc.interestengine.simulator.MessageProducer;
+import com.nuwc.interestengine.simulator.VesselManager;
 import java.awt.Color;
 import java.io.File;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import javax.swing.ImageIcon;
 import javax.swing.JColorChooser;
 import javax.swing.JFileChooser;
@@ -314,6 +318,7 @@ public class OptionsPanel extends javax.swing.JPanel
         jPanel1 = new javax.swing.JPanel();
         trainNetworkButton = new javax.swing.JButton();
         trainNetworkButton1 = new javax.swing.JButton();
+        runSimulationButton = new javax.swing.JButton();
 
         setPreferredSize(new java.awt.Dimension(500, 800));
 
@@ -1028,6 +1033,16 @@ public class OptionsPanel extends javax.swing.JPanel
             }
         });
 
+        runSimulationButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/route-play.png"))); // NOI18N
+        runSimulationButton.setText("Run Simulation");
+        runSimulationButton.addActionListener(new java.awt.event.ActionListener()
+        {
+            public void actionPerformed(java.awt.event.ActionEvent evt)
+            {
+                runSimulationButtonActionPerformed(evt);
+            }
+        });
+
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
         jPanel1Layout.setHorizontalGroup(
@@ -1037,6 +1052,8 @@ public class OptionsPanel extends javax.swing.JPanel
                 .addComponent(trainNetworkButton)
                 .addGap(18, 18, 18)
                 .addComponent(trainNetworkButton1)
+                .addGap(18, 18, 18)
+                .addComponent(runSimulationButton)
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
         jPanel1Layout.setVerticalGroup(
@@ -1045,7 +1062,8 @@ public class OptionsPanel extends javax.swing.JPanel
                 .addContainerGap()
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(trainNetworkButton, javax.swing.GroupLayout.PREFERRED_SIZE, 41, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(trainNetworkButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 41, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addComponent(trainNetworkButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 41, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(runSimulationButton, javax.swing.GroupLayout.PREFERRED_SIZE, 41, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
@@ -1305,6 +1323,37 @@ public class OptionsPanel extends javax.swing.JPanel
         }
     }//GEN-LAST:event_trainNetworkButton1ActionPerformed
 
+    private void runSimulationButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_runSimulationButtonActionPerformed
+    {//GEN-HEADEREND:event_runSimulationButtonActionPerformed
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setMultiSelectionEnabled(true);
+        int returnValue = fileChooser.showOpenDialog(this);
+
+        if (returnValue == JFileChooser.APPROVE_OPTION)
+        {
+            File[] files = fileChooser.getSelectedFiles();
+            Arrays.sort(files, (File file1, File file2) ->
+            {
+                String path1 = file1.getAbsolutePath();
+                String path2 = file2.getAbsolutePath();
+                return path1.compareTo(path2);
+            });
+            float minLat = ((Double) minLatSpinner.getValue()).floatValue();
+            float maxLat = ((Double) maxLatSpinner.getValue()).floatValue();
+            float minLon = ((Double) minLonSpinner.getValue()).floatValue();
+            float maxLon = ((Double) maxLonSpinner.getValue()).floatValue();
+
+            ConcurrentLinkedQueue messageQueue = new ConcurrentLinkedQueue();
+            VesselManager manager = new VesselManager(minLat, maxLat, minLon, maxLon, painter);
+            MessageProducer producer = new MessageProducer(files, messageQueue);
+            MessageConsumer consumer = new MessageConsumer(messageQueue, manager);
+            Thread producerThread = new Thread(producer);
+            Thread consumerThread = new Thread(consumer);
+            producerThread.start();
+            consumerThread.start();
+        }
+    }//GEN-LAST:event_runSimulationButtonActionPerformed
+
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JPanel AnalysisSettingsPanel;
     private javax.swing.JPanel DatabaseSettingsPanel;
@@ -1366,6 +1415,7 @@ public class OptionsPanel extends javax.swing.JPanel
     private javax.swing.JLabel numberVesselsLabel;
     private javax.swing.JButton playPauseButton;
     private javax.swing.JComboBox<String> routesModeCombo;
+    private javax.swing.JButton runSimulationButton;
     private javax.swing.JPanel simulationPanel;
     private javax.swing.JButton stopButton;
     private javax.swing.JTextField stopEpsilonField;

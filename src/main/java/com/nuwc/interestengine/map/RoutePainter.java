@@ -2,6 +2,7 @@ package com.nuwc.interestengine.map;
 
 import com.nuwc.interestengine.clustering.Cluster;
 import com.nuwc.interestengine.clustering.RouteObject;
+import com.nuwc.interestengine.clustering.Vessel;
 import com.nuwc.interestengine.data.AISPoint;
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -15,6 +16,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
@@ -37,6 +39,9 @@ public class RoutePainter implements Painter<JXMapViewer>
     private Ship selectedShip;
     private Marker selectedMarker;
 
+    private Vessel selectedVessel = null;
+
+    private List<Vessel> vessels = new ArrayList<>();
     private List<Cluster> clusters = new ArrayList<>();
     private List<RouteObject> routes = new ArrayList<>();
     private List<AISPoint> dataPoints = new ArrayList<>();
@@ -66,6 +71,22 @@ public class RoutePainter implements Painter<JXMapViewer>
         this.ships = ships;
         this.markers = markers;
         this.map = map;
+    }
+
+    public void replaceVessels(Collection<Vessel> newVessels)
+    {
+        vessels.clear();
+        for (Vessel vessel : newVessels)
+        {
+            vessels.add(vessel);
+        }
+
+        map.repaint();
+    }
+
+    public List<Vessel> getVessels()
+    {
+        return vessels;
     }
 
     public void setClusterColor(Color color)
@@ -456,6 +477,33 @@ public class RoutePainter implements Painter<JXMapViewer>
                 }
             }
         }
+
+        for (Vessel vessel : vessels)
+        {
+            if (vessel.track.size() > 0)
+            {
+                if (vessel == selectedVessel)
+                {
+                    continue;
+                }
+                vessel.draw(g, map, false);
+            }
+        }
+
+        if (selectedVessel != null)
+        {
+            selectedVessel.draw(g, map, true);
+        }
+    }
+
+    public Vessel getSelectedVessel()
+    {
+        return selectedVessel;
+    }
+
+    public void setSelectedVessel(Vessel vessel)
+    {
+        selectedVessel = vessel;
     }
 
     private ImageIcon getStartMarkerIcon()
