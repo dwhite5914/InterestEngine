@@ -1,24 +1,23 @@
 package com.nuwc.interestengine.map;
 
+import com.nuwc.interestengine.Utils;
 import com.nuwc.interestengine.clustering.Cluster;
 import com.nuwc.interestengine.clustering.RouteObject;
 import com.nuwc.interestengine.clustering.Vessel;
 import com.nuwc.interestengine.data.AISPoint;
+import com.nuwc.interestengine.data.Cell;
+import com.nuwc.interestengine.gui.MainFrame;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.RenderingHints;
-import java.awt.geom.AffineTransform;
 import java.awt.geom.Point2D;
-import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import javax.imageio.ImageIO;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import javax.swing.ImageIcon;
 import org.jxmapviewer.JXMapKit;
 import org.jxmapviewer.JXMapViewer;
@@ -30,24 +29,25 @@ public class RoutePainter implements Painter<JXMapViewer>
     private final Color LINE_COLOR = Color.BLACK;
     private final Color MARKER_COLOR = Color.BLUE;
     private final Color SHIP_COLOR = Color.RED;
-
     private final int MARKER_RADIUS = 4;
 
     private final List<Ship> ships;
-    private final List<TriMarker> markers;
     private final JXMapKit map;
     private Ship selectedShip;
     private Marker selectedMarker;
+    private final MainFrame mainFrame;
 
+    private Vessel focusedVessel = null;
     private Vessel selectedVessel = null;
 
-    private List<Vessel> vessels = new ArrayList<>();
+    private final ConcurrentLinkedQueue<Vessel> vessels = new ConcurrentLinkedQueue<>();
     private List<Cluster> clusters = new ArrayList<>();
     private List<RouteObject> routes = new ArrayList<>();
     private List<AISPoint> dataPoints = new ArrayList<>();
     private List<AISPoint> entryPoints = new ArrayList<>();
     private List<AISPoint> exitPoints = new ArrayList<>();
     private List<AISPoint> stopPoints = new ArrayList<>();
+    private List<Cell> cells = new ArrayList<>();
 
     private Color clusterColor = Color.RED;
     private Color routeColor = Color.BLUE;
@@ -56,35 +56,32 @@ public class RoutePainter implements Painter<JXMapViewer>
     private Color exitPointColor = Color.MAGENTA;
     private Color stopPointColor = Color.GREEN;
 
-    private boolean drawClusters = false;
-    private boolean drawRoutes = true;
+    private String clustersMode = "Single Color";
+    private String routesMode = "Rainbow";
     private boolean drawDataPoints = false;
     private boolean drawEntryPoints = false;
     private boolean drawExitPoints = false;
     private boolean drawStopPoints = false;
 
-    String clustersMode = "Single Color";
-    String routesMode = "Rainbow";
+    private RouteObject bestRoute = null;
 
-    public RoutePainter(List<Ship> ships, List<TriMarker> markers, JXMapKit map)
+    public RoutePainter(List<Ship> ships, List<TriMarker> markers, JXMapKit map, MainFrame mainFrame)
     {
         this.ships = ships;
-        this.markers = markers;
         this.map = map;
+        this.mainFrame = mainFrame;
     }
 
     public void replaceVessels(Collection<Vessel> newVessels)
     {
         vessels.clear();
-        for (Vessel vessel : newVessels)
-        {
-            vessels.add(vessel);
-        }
+        vessels.addAll(newVessels);
 
         map.repaint();
+        mainFrame.updateData();
     }
 
-    public List<Vessel> getVessels()
+    public ConcurrentLinkedQueue<Vessel> getVessels()
     {
         return vessels;
     }
@@ -159,18 +156,6 @@ public class RoutePainter implements Painter<JXMapViewer>
         map.repaint();
     }
 
-    public void setDrawClusters(boolean drawClusters)
-    {
-        this.drawClusters = drawClusters;
-        map.repaint();
-    }
-
-    public void setDrawRoutes(boolean drawRoutes)
-    {
-        this.drawRoutes = drawRoutes;
-        map.repaint();
-    }
-
     public void setDrawDataPoints(boolean drawDataPoints)
     {
         this.drawDataPoints = drawDataPoints;
@@ -224,186 +209,182 @@ public class RoutePainter implements Painter<JXMapViewer>
         ship.fireRouteStateChange();
     }
 
-    @Override
-    public void paint(Graphics2D g, JXMapViewer map, int i, int i1)
+    public RouteObject getBestRoute()
     {
-        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
-                RenderingHints.VALUE_ANTIALIAS_ON);
-        for (TriMarker marker : markers)
+        return bestRoute;
+    }
+
+    public void setBestRoute(RouteObject bestRoute)
+    {
+        this.bestRoute = bestRoute;
+        map.repaint();
+    }
+
+    public void drawDataPoints(Graphics2D g, JXMapViewer map)
+    {
+        for (AISPoint point : dataPoints)
         {
-            GeoPosition position = marker.getPosition();
+            GeoPosition position = new GeoPosition(point.lat, point.lon);
             Point2D mapPoint = map.convertGeoPositionToPoint(position);
             if (g.getClip().contains(mapPoint))
             {
-                paintTriMarker(g, mapPoint, marker.getCog(), getTriMarkerBI());
+                paintMarker(g, mapPoint, dataPointColor);
             }
         }
+    }
 
-        if (drawDataPoints)
+    public void drawEntryPoints(Graphics2D g, JXMapViewer map)
+    {
+        for (AISPoint point : entryPoints)
         {
-            for (AISPoint point : dataPoints)
+            GeoPosition position = new GeoPosition(point.lat, point.lon);
+            Point2D mapPoint = map.convertGeoPositionToPoint(position);
+            if (g.getClip().contains(mapPoint))
+            {
+                paintMarker(g, mapPoint, entryPointColor);
+            }
+        }
+    }
+
+    public void drawExitPoints(Graphics2D g, JXMapViewer map)
+    {
+        for (AISPoint point : exitPoints)
+        {
+            GeoPosition position = new GeoPosition(point.lat, point.lon);
+            Point2D mapPoint = map.convertGeoPositionToPoint(position);
+            if (g.getClip().contains(mapPoint))
+            {
+                paintMarker(g, mapPoint, exitPointColor);
+            }
+        }
+    }
+
+    public void drawStopPoints(Graphics2D g, JXMapViewer map)
+    {
+        for (AISPoint point : stopPoints)
+        {
+            GeoPosition position = new GeoPosition(point.lat, point.lon);
+            Point2D mapPoint = map.convertGeoPositionToPoint(position);
+            if (g.getClip().contains(mapPoint))
+            {
+                paintMarker(g, mapPoint, stopPointColor);
+            }
+        }
+    }
+
+    public void drawSingleColorRoutes(Graphics2D g, JXMapViewer map)
+    {
+        for (RouteObject route : routes)
+        {
+            for (AISPoint point : route.points)
             {
                 GeoPosition position = new GeoPosition(point.lat, point.lon);
                 Point2D mapPoint = map.convertGeoPositionToPoint(position);
                 if (g.getClip().contains(mapPoint))
                 {
-                    paintMarker(g, mapPoint, dataPointColor);
+                    paintMarker(g, mapPoint, routeColor);
                 }
             }
         }
+    }
 
-        if (drawEntryPoints)
+    public void drawRainbowColoredRoutes(Graphics2D g, JXMapViewer map)
+    {
+        for (RouteObject route : routes)
         {
-            for (AISPoint point : entryPoints)
+            for (AISPoint point : route.points)
             {
                 GeoPosition position = new GeoPosition(point.lat, point.lon);
                 Point2D mapPoint = map.convertGeoPositionToPoint(position);
                 if (g.getClip().contains(mapPoint))
                 {
-                    paintMarker(g, mapPoint, entryPointColor);
+                    paintMarker(g, mapPoint, route.color);
                 }
             }
         }
+    }
 
-        if (drawExitPoints)
+    public void drawSingleColorClusters(Graphics2D g, JXMapViewer map)
+    {
+        int c = 0;
+        for (Cluster cluster : clusters)
         {
-            for (AISPoint point : exitPoints)
+            if (cluster.getIsActive())
             {
-                GeoPosition position = new GeoPosition(point.lat, point.lon);
-                Point2D mapPoint = map.convertGeoPositionToPoint(position);
-                if (g.getClip().contains(mapPoint))
+                Point2D centroid = cluster.getCentroid(map);
+                paintCluster(g, c, centroid, clusterColor);
+                c++;
+            }
+        }
+    }
+
+    public void drawRainbowColoredClusters(Graphics2D g, JXMapViewer map)
+    {
+        int c = 0;
+        for (Cluster cluster : clusters)
+        {
+            if (cluster.getIsActive())
+            {
+                Point2D centroid = cluster.getCentroid(map);
+                paintCluster(g, c, centroid, cluster.color);
+                c++;
+            }
+        }
+    }
+
+    public void drawClustersWithPoints(Graphics2D g, JXMapViewer map)
+    {
+        int c = 0;
+        for (Cluster cluster : clusters)
+        {
+            if (cluster.getIsActive())
+            {
+                for (AISPoint point : cluster.points)
                 {
-                    paintMarker(g, mapPoint, exitPointColor);
+                    GeoPosition position = new GeoPosition(point.lat, point.lon);
+                    Point2D mapPoint = map.convertGeoPositionToPoint(position);
+                    if (g.getClip().contains(mapPoint))
+                    {
+                        paintMarker(g, mapPoint, cluster.color);
+                    }
                 }
+                Point2D centroid = cluster.getCentroid(map);
+                paintCluster(g, c, centroid, cluster.color);
+                c++;
             }
         }
+    }
 
-        if (drawStopPoints)
+    public void drawConnectedClusters(Graphics2D g, JXMapViewer map)
+    {
+        int rid = 0;
+        for (RouteObject route : routes)
         {
-            for (AISPoint point : stopPoints)
+            for (int j = 0; j < route.waypoints.size(); j++)
             {
-                GeoPosition position = new GeoPosition(point.lat, point.lon);
-                Point2D mapPoint = map.convertGeoPositionToPoint(position);
-                if (g.getClip().contains(mapPoint))
+                Cluster cluster = route.waypoints.get(j);
+                Point2D centroid = cluster.getCentroid(map);
+                paintCluster(g, rid, centroid, route.color);
+                if (j + 1 < route.waypoints.size())
                 {
-                    paintMarker(g, mapPoint, stopPointColor);
+                    Cluster cluster2 = route.waypoints.get(j + 1);
+                    Point2D centroid2 = cluster2.getCentroid(map);
+                    Color oldColor = g.getColor();
+                    g.setColor(route.color);
+                    g.drawLine((int) centroid.getX(),
+                            (int) centroid.getY(),
+                            (int) centroid2.getX(),
+                            (int) centroid2.getY());
+                    g.setColor(oldColor);
+
                 }
             }
+            rid++;
         }
+    }
 
-        if (drawRoutes)
-        {
-            switch (routesMode)
-            {
-                case "Single Color":
-                    for (RouteObject route : routes)
-                    {
-                        for (AISPoint point : route.points)
-                        {
-                            GeoPosition position = new GeoPosition(point.lat, point.lon);
-                            Point2D mapPoint = map.convertGeoPositionToPoint(position);
-                            if (g.getClip().contains(mapPoint))
-                            {
-                                paintMarker(g, mapPoint, routeColor);
-                            }
-                        }
-                    }
-                    break;
-                case "Rainbow":
-                    for (RouteObject route : routes)
-                    {
-                        for (AISPoint point : route.points)
-                        {
-                            GeoPosition position = new GeoPosition(point.lat, point.lon);
-                            Point2D mapPoint = map.convertGeoPositionToPoint(position);
-                            if (g.getClip().contains(mapPoint))
-                            {
-                                paintMarker(g, mapPoint, route.color);
-                            }
-                        }
-                    }
-                    break;
-            }
-        }
-
-        if (drawClusters)
-        {
-            switch (clustersMode)
-            {
-                case "Single Color":
-                    int c = 0;
-                    for (Cluster cluster : clusters)
-                    {
-                        if (cluster.getIsActive())
-                        {
-                            Point2D centroid = cluster.getCentroid(map);
-                            paintCluster(g, c, centroid, clusterColor);
-                            c++;
-                        }
-                    }
-                    break;
-                case "Rainbow":
-                    c = 0;
-                    for (Cluster cluster : clusters)
-                    {
-                        if (cluster.getIsActive())
-                        {
-                            Point2D centroid = cluster.getCentroid(map);
-                            paintCluster(g, c, centroid, cluster.color);
-                            c++;
-                        }
-                    }
-                    break;
-                case "With Points":
-                    c = 0;
-                    for (Cluster cluster : clusters)
-                    {
-                        if (cluster.getIsActive())
-                        {
-                            for (AISPoint point : cluster.points)
-                            {
-                                GeoPosition position = new GeoPosition(point.lat, point.lon);
-                                Point2D mapPoint = map.convertGeoPositionToPoint(position);
-                                if (g.getClip().contains(mapPoint))
-                                {
-                                    paintMarker(g, mapPoint, cluster.color);
-                                }
-                            }
-                            Point2D centroid = cluster.getCentroid(map);
-                            paintCluster(g, c, centroid, cluster.color);
-                            c++;
-                        }
-                    }
-                    break;
-                case "Connected":
-                    int rid = 0;
-                    for (RouteObject route : routes)
-                    {
-                        for (int j = 0; j < route.waypoints.size(); j++)
-                        {
-                            Cluster cluster = route.waypoints.get(j);
-                            Point2D centroid = cluster.getCentroid(map);
-                            paintCluster(g, rid, centroid, route.color);
-                            if (j + 1 < route.waypoints.size())
-                            {
-                                Cluster cluster2 = route.waypoints.get(j + 1);
-                                Point2D centroid2 = cluster2.getCentroid(map);
-                                Color oldColor = g.getColor();
-                                g.setColor(route.color);
-                                g.drawLine((int) centroid.getX(),
-                                        (int) centroid.getY(),
-                                        (int) centroid2.getX(),
-                                        (int) centroid2.getY());
-                                g.setColor(oldColor);
-
-                            }
-                        }
-                        rid++;
-                    }
-                    break;
-            }
-        }
-
+    private void drawFakeShips(Graphics2D g, JXMapViewer map)
+    {
         for (Ship ship : ships)
         {
             List<Point2D> mapPoints = new ArrayList<>();
@@ -477,23 +458,139 @@ public class RoutePainter implements Painter<JXMapViewer>
                 }
             }
         }
+    }
+
+    private void drawSimulatedVessels(Graphics2D g, JXMapViewer map)
+    {
+        for (Vessel vessel : vessels)
+        {
+            if (vessel.track.size() > 0
+                    && vessel != focusedVessel
+                    && vessel != selectedVessel
+                    && Utils.isAnchored(vessel.navStatus))
+            {
+                vessel.draw(g, map, false, false);
+            }
+        }
 
         for (Vessel vessel : vessels)
         {
-            if (vessel.track.size() > 0)
+            if (vessel.track.size() > 0
+                    && vessel != focusedVessel
+                    && vessel != selectedVessel
+                    && !Utils.isAnchored(vessel.navStatus))
             {
-                if (vessel == selectedVessel)
-                {
-                    continue;
-                }
-                vessel.draw(g, map, false);
+                vessel.draw(g, map, false, false);
             }
         }
 
         if (selectedVessel != null)
         {
-            selectedVessel.draw(g, map, true);
+            selectedVessel.draw(g, map, false, true);
         }
+
+        if (focusedVessel != null)
+        {
+            focusedVessel.draw(g, map, true, false);
+        }
+    }
+
+    @Override
+    public void paint(Graphics2D g, JXMapViewer map, int i, int i1)
+    {
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                RenderingHints.VALUE_ANTIALIAS_ON);
+
+        if (drawDataPoints)
+        {
+            drawDataPoints(g, map);
+        }
+
+        if (drawEntryPoints)
+        {
+            drawEntryPoints(g, map);
+        }
+
+        if (drawExitPoints)
+        {
+            drawExitPoints(g, map);
+        }
+
+        if (drawStopPoints)
+        {
+            drawStopPoints(g, map);
+        }
+
+        switch (routesMode)
+        {
+            case "Single Color":
+                drawSingleColorRoutes(g, map);
+                break;
+            case "Rainbow":
+                drawRainbowColoredRoutes(g, map);
+                break;
+            default:
+                break;
+        }
+
+        switch (clustersMode)
+        {
+            case "Single Color":
+                drawSingleColorClusters(g, map);
+                break;
+            case "Rainbow":
+                drawRainbowColoredClusters(g, map);
+                break;
+            case "With Points":
+                drawClustersWithPoints(g, map);
+                break;
+            case "Connected":
+                drawConnectedClusters(g, map);
+                break;
+            default:
+                break;
+        }
+
+        if (bestRoute != null)
+        {
+            for (AISPoint point : bestRoute.points)
+            {
+                GeoPosition position = new GeoPosition(point.lat, point.lon);
+                Point2D mapPoint = map.convertGeoPositionToPoint(position);
+                if (g.getClip().contains(mapPoint))
+                {
+                    paintMarker(g, mapPoint, bestRoute.color);
+                }
+            }
+        }
+
+        drawFakeShips(g, map);
+
+        drawSimulatedVessels(g, map);
+
+        if (cells != null)
+        {
+            for (Cell cell : cells)
+            {
+                cell.draw(g, map);
+            }
+        }
+    }
+
+    public void setCells(List<Cell> cells)
+    {
+        this.cells = cells;
+        map.repaint();
+    }
+
+    public Vessel getFocusedVessel()
+    {
+        return focusedVessel;
+    }
+
+    public void setFocusedVessel(Vessel focusedVessel)
+    {
+        this.focusedVessel = focusedVessel;
     }
 
     public Vessel getSelectedVessel()
@@ -501,9 +598,9 @@ public class RoutePainter implements Painter<JXMapViewer>
         return selectedVessel;
     }
 
-    public void setSelectedVessel(Vessel vessel)
+    public void setSelectedVessel(Vessel selectedVessel)
     {
-        selectedVessel = vessel;
+        this.selectedVessel = selectedVessel;
     }
 
     private ImageIcon getStartMarkerIcon()
@@ -516,19 +613,6 @@ public class RoutePainter implements Painter<JXMapViewer>
     {
         String path = "/com/nuwc/interestengine/resources/map/marker-end.png";
         return new ImageIcon(getClass().getResource(path));
-    }
-
-    private BufferedImage getTriMarkerBI()
-    {
-        String path = "/com/nuwc/interestengine/resources/map/marker-tri.png";
-        try
-        {
-            return ImageIO.read(new File(getClass().getResource(path).getPath()));
-        }
-        catch (IOException ex)
-        {
-            return null;
-        }
     }
 
     private void paintSpecial(final Graphics2D g, final Point2D point,
@@ -562,21 +646,6 @@ public class RoutePainter implements Painter<JXMapViewer>
         g.setFont(new Font("Calibri", Font.PLAIN, 20));
         g.drawString("" + id, x - radius, y - radius);
         g.setFont(oldFont);
-    }
-
-    private void paintTriMarker(Graphics2D g, Point2D point, double cog, BufferedImage bi)
-    {
-        int x = (int) point.getX();
-        int y = (int) point.getY();
-        int width = bi.getWidth();
-        int height = bi.getHeight();
-        double rotation = Math.toRadians(cog);
-        AffineTransform originalTransform = g.getTransform();
-        AffineTransform transform = new AffineTransform();
-        transform.rotate(rotation, x, y);
-        g.setTransform(transform);
-        g.drawImage(bi, x - width / 2, y - height / 2, null);
-        g.setTransform(originalTransform);
     }
 
     private void paintShip(Graphics2D g, Point2D point, Color color)

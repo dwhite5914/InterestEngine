@@ -2,14 +2,14 @@ package com.nuwc.interestengine.clustering;
 
 import com.nuwc.interestengine.Utils;
 import com.nuwc.interestengine.data.AISPoint;
+import dk.tbsalling.aismessages.ais.messages.types.NavigationStatus;
 import java.awt.BasicStroke;
 import java.awt.Color;
-import java.awt.FontMetrics;
+import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Polygon;
-import java.awt.Rectangle;
 import java.awt.Stroke;
 import java.awt.font.FontRenderContext;
 import java.awt.font.TextLayout;
@@ -25,7 +25,10 @@ public class Vessel
 {
     public int mmsi;
     public List<AISPoint> track;
+    public String shipName;
     public String shipType;
+    public NavigationStatus navStatus;
+    public String destination;
     public ShipStatus status;
     public float averageSpeed;
 
@@ -48,7 +51,11 @@ public class Vessel
     public Vessel(int mmsi)
     {
         this.mmsi = mmsi;
+
+        shipName = null;
         shipType = null;
+        navStatus = null;
+        destination = null;
         averageSpeed = 0;
         track = new ArrayList<>();
         status = ShipStatus.SAILING;
@@ -72,17 +79,33 @@ public class Vessel
 
     public boolean contains(Point2D point)
     {
-        return lastPoly.contains(point);
+        if (lastPoly == null)
+        {
+            return false;
+        }
+        else
+        {
+            return lastPoly.contains(point);
+        }
     }
 
-    public void draw(Graphics g, JXMapViewer map, boolean isSelected)
+    public void draw(Graphics g, JXMapViewer map, boolean isFocused,
+            boolean isSelected)
     {
+        boolean isAnchored = Utils.isAnchored(navStatus);
         AISPoint current = last();
         GeoPosition position = new GeoPosition(current.lat, current.lon);
         Point2D center = map.convertGeoPositionToPoint(position);
 
-        AffineTransform scale = AffineTransform
-                .getScaleInstance(1.5, 1.5);
+        AffineTransform scale;
+        if (isAnchored)
+        {
+            scale = AffineTransform.getScaleInstance(1.2, 1.2);
+        }
+        else
+        {
+            scale = AffineTransform.getScaleInstance(1.5, 1.5);
+        }
         AffineTransform rotate = AffineTransform
                 .getRotateInstance(Math.toRadians(current.cog));
         AffineTransform translate = AffineTransform
@@ -103,6 +126,10 @@ public class Vessel
         Stroke oldStroke = g2.getStroke();
         String shipCategory = Utils.getShipCategory(shipType);
         Color fillColor = Utils.getShipColor(shipCategory);
+        if (isAnchored)
+        {
+            fillColor = addAlpha(fillColor, 0.5);
+        }
         g2.setColor(fillColor);
         g2.fillPolygon(poly);
         g2.setColor(fillColor.darker());
@@ -111,16 +138,41 @@ public class Vessel
         g2.setColor(oldColor);
         g2.setStroke(oldStroke);
 
+        if (isFocused)
+        {
+            int xBounds = (int) poly.getBounds2D().getX();
+            int yBounds = (int) poly.getBounds2D().getY();
+            int wBounds = (int) poly.getBounds2D().getWidth();
+            int hBounds = (int) poly.getBounds2D().getHeight();
+            int centerX = xBounds + wBounds / 2;
+            int centerY = yBounds + hBounds / 2;
+            int yBox = drawFocusBox(g2, centerX, centerY);
+            drawTextBox(g2, centerX, centerY, yBox);
+        }
+
         if (isSelected)
         {
-            int centerX = (int) center.getX();
-            int centerY = (int) center.getY();
-            int yBox = drawSelectionBox(g2, centerX, centerY);
-            drawTextBox(g2, centerX, centerY, yBox);
+            int xBounds = (int) poly.getBounds2D().getX();
+            int yBounds = (int) poly.getBounds2D().getY();
+            int wBounds = (int) poly.getBounds2D().getWidth();
+            int hBounds = (int) poly.getBounds2D().getHeight();
+            int centerX = xBounds + wBounds / 2;
+            int centerY = yBounds + hBounds / 2;
+            drawSelectionBox(g2, centerX, centerY);
         }
     }
 
-    private int drawSelectionBox(Graphics2D g2, int centerX, int centerY)
+    private Color addAlpha(Color color, double percentAlpha)
+    {
+        int r = color.getRed();
+        int g = color.getGreen();
+        int b = color.getBlue();
+        int a = (int) (255 * percentAlpha);
+
+        return new Color(r, g, b, a);
+    }
+
+    private int drawFocusBox(Graphics2D g2, int centerX, int centerY)
     {
         Color oldColor = g2.getColor();
         Stroke oldStroke = g2.getStroke();
@@ -131,14 +183,29 @@ public class Vessel
                     2
                 }, 0);
         g2.setStroke(dashed);
-        int x = (int) centerX - 10;
-        int y = (int) centerY - 10;
-        int length = 20;
+        int x = (int) centerX - 18;
+        int y = (int) centerY - 18;
+        int length = 36;
         g2.drawRect(x, y, length, length);
         g2.setColor(oldColor);
         g2.setStroke(oldStroke);
 
         return y;
+    }
+
+    private void drawSelectionBox(Graphics2D g2, int centerX, int centerY)
+    {
+        Color oldColor = g2.getColor();
+        Stroke oldStroke = g2.getStroke();
+        g2.setColor(Color.RED);
+        Stroke solid = new BasicStroke(2);
+        g2.setStroke(solid);
+        int x = (int) centerX - 18;
+        int y = (int) centerY - 18;
+        int length = 36;
+        g2.drawOval(x, y, length, length);
+        g2.setColor(oldColor);
+        g2.setStroke(oldStroke);
     }
 
     private void drawTextBox(Graphics2D g2, int centerX, int centerY, int yBox)
@@ -148,12 +215,20 @@ public class Vessel
         String lines[] =
         {
             String.format("MMSI: %d", mmsi),
+            String.format("Name: %s",
+            (shipName == null) ? "Unknown" : shipName),
             String.format("Position: (%.2f, %.2f)", current.lat, current.lon),
             String.format("Speed: %.1f knots", current.sog),
             String.format("Course: %.0f %s", current.cog, Utils.DEGREE),
-            String.format("Type: %s", Utils.getShipCategory(shipType))
+            String.format("Type: %s", Utils.getShipCategory(shipType)),
+            String.format("Status: %s",
+            (navStatus == null) ? "Undefined" : navStatus),
+            String.format("Destination: %s",
+            (destination == null) ? "Unreported" : destination)
         };
         String firstLine = lines[0];
+        Font oldFont = g2.getFont();
+        g2.setFont(new Font(oldFont.getFontName(), Font.PLAIN, 14));
         FontRenderContext frc = g2.getFontRenderContext();
         TextLayout layout = new TextLayout(firstLine, g2.getFont(), frc);
         Rectangle2D bounds = layout.getBounds();
@@ -178,15 +253,22 @@ public class Vessel
         int rHeight = height + 5;
         int rx1 = x1 - 5;
         int ry1 = y1;
-        g2.setColor(new Color(0.9f, 0.9f, 0.9f, 0.7f));
+
+        g2.setColor(
+                new Color(0.9f, 0.9f, 0.9f, 0.85f));
         g2.fillRect(rx1, ry1, rWidth, rHeight);
+
         g2.setColor(Color.BLACK);
+
         g2.drawRect(rx1, ry1, rWidth, rHeight);
-        for (int i = 1; i <= lines.length; i++)
+        for (int i = 1;
+                i <= lines.length;
+                i++)
         {
             g2.drawString(lines[i - 1], x1, y1 + i * lineHeight);
         }
 
         g2.setColor(oldColor);
+        g2.setFont(oldFont);
     }
 }

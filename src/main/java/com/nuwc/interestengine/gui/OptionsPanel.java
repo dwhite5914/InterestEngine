@@ -1,8 +1,10 @@
 package com.nuwc.interestengine.gui;
 
+import com.nuwc.interestengine.Utils;
 import com.nuwc.interestengine.data.Database;
 import com.nuwc.interestengine.clustering.RouteExtractor;
 import com.nuwc.interestengine.clustering.RouteObject;
+import com.nuwc.interestengine.clustering.Vessel;
 import com.nuwc.interestengine.map.RoutePainter;
 import com.nuwc.interestengine.parser.NMEAParser;
 import com.nuwc.interestengine.map.Ship;
@@ -15,6 +17,7 @@ import com.nuwc.interestengine.simulator.MessageConsumer;
 import com.nuwc.interestengine.simulator.MessageProducer;
 import com.nuwc.interestengine.simulator.VesselManager;
 import java.awt.Color;
+import java.awt.Font;
 import java.io.File;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -26,16 +29,33 @@ import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.SpinnerNumberModel;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableModel;
+import org.deeplearning4j.nn.weights.WeightInit;
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.JFreeChart;
+import org.jfree.chart.plot.PiePlot;
+import org.jfree.data.general.DefaultPieDataset;
+import org.jxmapviewer.JXMapKit;
+import org.jxmapviewer.viewer.GeoPosition;
+import org.nd4j.linalg.activations.Activation;
 
 public class OptionsPanel extends javax.swing.JPanel
 {
     private final List<Ship> ships;
     private final Simulation simulation;
     private final List<TriMarker> markers;
-    private final RoutePainter painter;
+    private final RoutePainter routePainter;
     private final MainFrame mainFrame;
     private final Database db;
+    private SelectionPanel selectionPanel;
+
+    private VesselManager manager;
+    private MessageProducer producer;
+    private MessageConsumer consumer;
+
+    private JFreeChart pieChart;
+    private DefaultPieDataset pieData;
 
     private final Color defaultColorClusters = Color.RED;
     private final Color defaultColorRoutes = Color.BLUE;
@@ -52,23 +72,75 @@ public class OptionsPanel extends javax.swing.JPanel
     private Color colorStopPoints = null;
 
     private List<RouteObject> routes = null;
+    private List<RouteObject> oversampledRoutes = null;
     private NeuralNet network = null;
 
+    private JXMapKit miniMap;
+    private boolean modifyingMiniMap = false;
+
     public OptionsPanel(List<Ship> ships, Simulation simulation,
-            List<TriMarker> markers, RoutePainter painter, MainFrame mainFrame)
+            List<TriMarker> markers, RoutePainter routePainter,
+            JXMapKit miniMap, MainFrame mainFrame)
     {
         this.ships = ships;
         this.simulation = simulation;
         this.markers = markers;
-        this.painter = painter;
+        this.routePainter = routePainter;
         this.mainFrame = mainFrame;
         this.db = new Database();
+        this.miniMap = miniMap;
 
+        loadData();
         initListeners();
         initComponents();
         initTweaks();
 
         updateTables();
+    }
+
+    public SelectionPanel getSelectionPanel()
+    {
+        return selectionPanel;
+    }
+
+    public void setSelectionPanel(SelectionPanel selectionPanel)
+    {
+        this.selectionPanel = selectionPanel;
+    }
+
+    public NeuralNet getNeuralNet()
+    {
+        return network;
+    }
+
+    public List<RouteObject> getRoutes()
+    {
+        return routes;
+    }
+
+    private void loadData()
+    {
+
+    }
+
+    public float getMinLat()
+    {
+        return ((Double) minLatSpinner.getValue()).floatValue();
+    }
+
+    public float getMaxLat()
+    {
+        return ((Double) maxLatSpinner.getValue()).floatValue();
+    }
+
+    public float getMinLon()
+    {
+        return ((Double) minLonSpinner.getValue()).floatValue();
+    }
+
+    public float getMaxLon()
+    {
+        return ((Double) maxLonSpinner.getValue()).floatValue();
     }
 
     private void initListeners()
@@ -78,12 +150,52 @@ public class OptionsPanel extends javax.swing.JPanel
 
     private void initTweaks()
     {
-        colorClustersBox.setBackground(defaultColorClusters);
-        colorRoutesBox.setBackground(defaultColorRoutes);
-        colorDataPointsBox.setBackground(defaultColorDataPoints);
-        colorEntryPointsBox.setBackground(defaultColorEntryPoints);
-        colorExitPointsBox.setBackground(defaultColorExitPoints);
-        colorStopPointsBox.setBackground(defaultColorStopPoints);
+        pieData = new DefaultPieDataset();
+
+        pieChart = ChartFactory.createPieChart(
+                "Ship Types",
+                pieData,
+                true,
+                false,
+                false
+        );
+        pieChart.getTitle().setFont(new Font("SansSerif", Font.BOLD, 16));
+        pieChart.setBackgroundPaint(new Color(240, 240, 240));
+
+        PiePlot plot = (PiePlot) pieChart.getPlot();
+        plot.setLabelFont(new Font("SansSerif", Font.PLAIN, 12));
+        plot.setNoDataMessage("No data available");
+        plot.setCircular(true);
+        plot.setLabelGap(0.02);
+        plot.setBackgroundPaint(new Color(240, 240, 240));
+        plot.setOutlineVisible(false);
+        plot.setLabelGenerator(null);
+
+        shipTypesChart.setChart(pieChart);
+        shipTypesChart.repaint();
+
+        updateMiniMap();
+    }
+
+    private void updateMiniMap()
+    {
+        float minLat = ((Double) minLatSpinner.getValue()).floatValue();
+        float maxLat = ((Double) maxLatSpinner.getValue()).floatValue();
+        float minLon = ((Double) minLonSpinner.getValue()).floatValue();
+        float maxLon = ((Double) maxLonSpinner.getValue()).floatValue();
+        GeoPosition start = new GeoPosition(maxLat, minLon);
+        GeoPosition end = new GeoPosition(minLat, maxLon);
+        miniMapPanel.setRegion(start, end);
+    }
+
+    public boolean isModifyingMiniMap()
+    {
+        return modifyingMiniMap;
+    }
+
+    public void setModifyingMiniMap(boolean modifyingMiniMap)
+    {
+        this.modifyingMiniMap = modifyingMiniMap;
     }
 
     private ImageIcon getPlayIcon()
@@ -104,6 +216,30 @@ public class OptionsPanel extends javax.swing.JPanel
         return new ImageIcon(getClass().getResource(path));
     }
 
+    public void updateChart(RoutePainter painter)
+    {
+        ConcurrentLinkedQueue<Vessel> vessels = painter.getVessels();
+        numActiveVesselsField.setText("" + vessels.size());
+
+        for (Vessel vessel : vessels)
+        {
+            String shipCategory = Utils.getShipCategory(vessel.shipType);
+            if (pieData.getIndex(shipCategory) == -1)
+            {
+                pieData.setValue(shipCategory, 1);
+                PiePlot plot = (PiePlot) pieChart.getPlot();
+                plot.setSectionPaint(shipCategory,
+                        Utils.getShipColor(shipCategory));
+            }
+            else
+            {
+                pieData.setValue(shipCategory,
+                        pieData.getValue(shipCategory).intValue() + 1);
+            }
+        }
+        shipTypesChart.repaint();
+    }
+
     public void interruptSimulation()
     {
         if (simulation.getState() != SimulationState.STOPPED)
@@ -116,35 +252,35 @@ public class OptionsPanel extends javax.swing.JPanel
 
     public synchronized void updatePanel()
     {
-        SimulationState state = simulation.getState();
-        if (ships.isEmpty())
-        {
-            playPauseButton.setIcon(getPlayIcon());
-            playPauseButton.setText("Play");
-            stopButton.setEnabled(false);
-            playPauseButton.setEnabled(false);
-        }
-        else if (state == SimulationState.STOPPED)
-        {
-            playPauseButton.setIcon(getPlayIcon());
-            playPauseButton.setText("Play");
-            stopButton.setEnabled(false);
-            playPauseButton.setEnabled(true);
-        }
-        else if (state == SimulationState.PAUSED)
-        {
-            playPauseButton.setIcon(getPlayIcon());
-            playPauseButton.setText("Play");
-            stopButton.setEnabled(true);
-            playPauseButton.setEnabled(true);
-        }
-        else
-        {
-            playPauseButton.setIcon(getPauseIcon());
-            playPauseButton.setText("Pause");
-            stopButton.setEnabled(true);
-            playPauseButton.setEnabled(true);
-        }
+//        SimulationState state = simulation.getState();
+//        if (ships.isEmpty())
+//        {
+//            playPauseButton.setIcon(getPlayIcon());
+//            playPauseButton.setText("Play");
+//            stopButton.setEnabled(false);
+//            playPauseButton.setEnabled(false);
+//        }
+//        else if (state == SimulationState.STOPPED)
+//        {
+//            playPauseButton.setIcon(getPlayIcon());
+//            playPauseButton.setText("Play");
+//            stopButton.setEnabled(false);
+//            playPauseButton.setEnabled(true);
+//        }
+//        else if (state == SimulationState.PAUSED)
+//        {
+//            playPauseButton.setIcon(getPlayIcon());
+//            playPauseButton.setText("Play");
+//            stopButton.setEnabled(true);
+//            playPauseButton.setEnabled(true);
+//        }
+//        else
+//        {
+//            playPauseButton.setIcon(getPauseIcon());
+//            playPauseButton.setText("Pause");
+//            stopButton.setEnabled(true);
+//            playPauseButton.setEnabled(true);
+//        }
     }
 
     private void updateTables()
@@ -161,7 +297,7 @@ public class OptionsPanel extends javax.swing.JPanel
                 model.addRow(point);
             }
 
-            numberAISPointsField.setText("" + points.size());
+            numAISPointsField.setText("" + points.size());
             HashMap<Integer, Boolean> vessels = new HashMap<>();
             for (Object[] point : points)
             {
@@ -171,7 +307,7 @@ public class OptionsPanel extends javax.swing.JPanel
                     vessels.put(mmsi, true);
                 }
             }
-            numberVesselsField.setText("" + vessels.size());
+            numVesselsField.setText("" + vessels.size());
         }
     }
 
@@ -204,22 +340,22 @@ public class OptionsPanel extends javax.swing.JPanel
             switch (name)
             {
                 case "clusters":
-                    painter.setClusterColor(color);
+                    routePainter.setClusterColor(color);
                     break;
                 case "routes":
-                    painter.setRouteColor(color);
+                    routePainter.setRouteColor(color);
                     break;
                 case "dataPoints":
-                    painter.setDataPointColor(color);
+                    routePainter.setDataPointColor(color);
                     break;
                 case "entryPoints":
-                    painter.setEntryPointColor(color);
+                    routePainter.setEntryPointColor(color);
                     break;
                 case "exitPoints":
-                    painter.setExitPointColor(color);
+                    routePainter.setExitPointColor(color);
                     break;
                 case "stopPoints":
-                    painter.setStopPointColor(color);
+                    routePainter.setStopPointColor(color);
                     break;
             }
         }
@@ -248,86 +384,129 @@ public class OptionsPanel extends javax.swing.JPanel
     private void initComponents()
     {
 
-        mainScroller = new javax.swing.JScrollPane();
-        mainScrollerPanel = new javax.swing.JPanel();
-        databasePanel = new javax.swing.JPanel();
+        jTabbedPane1 = new javax.swing.JTabbedPane();
+        jScrollPane2 = new javax.swing.JScrollPane();
+        jPanel3 = new javax.swing.JPanel();
+        databaseAccordion = new com.nuwc.interestengine.gui.FoldablePanel();
+        jPanel4 = new javax.swing.JPanel();
         loadDataButton = new javax.swing.JButton();
-        databaseTabs = new javax.swing.JTabbedPane();
+        numAISPointsLabel = new javax.swing.JLabel();
+        numAISPointsField = new javax.swing.JTextField();
+        numVesselsLabel = new javax.swing.JLabel();
+        numVesselsField = new javax.swing.JTextField();
+        jPanel1 = new javax.swing.JPanel();
+        jTextField17 = new javax.swing.JTextField();
+        minLatSpinner = new javax.swing.JSpinner();
+        jTextField18 = new javax.swing.JTextField();
+        maxLatSpinner = new javax.swing.JSpinner();
+        jTextField19 = new javax.swing.JTextField();
+        minLonSpinner = new javax.swing.JSpinner();
+        jTextField20 = new javax.swing.JTextField();
+        maxLonSpinner = new javax.swing.JSpinner();
+        miniMapPanel = new com.nuwc.interestengine.gui.MapPanel();
+        foldablePanel1 = new com.nuwc.interestengine.gui.FoldablePanel();
+        jPanel10 = new javax.swing.JPanel();
         vesselDataScroller = new javax.swing.JScrollPane();
         vesselDataTable = new javax.swing.JTable();
-        numberAISPointsLabel = new javax.swing.JLabel();
-        numberVesselsLabel = new javax.swing.JLabel();
-        numberAISPointsField = new javax.swing.JTextField();
-        numberVesselsField = new javax.swing.JTextField();
-        DatabaseSettingsPanel = new javax.swing.JPanel();
-        minLatLabel = new javax.swing.JLabel();
-        maxLatLabel = new javax.swing.JLabel();
-        minLatSpinner = new javax.swing.JSpinner();
-        maxLatSpinner = new javax.swing.JSpinner();
-        minLonLabel = new javax.swing.JLabel();
-        minLonSpinner = new javax.swing.JSpinner();
-        maxLonLabel = new javax.swing.JLabel();
-        maxLonSpinner = new javax.swing.JSpinner();
-        simulationPanel = new javax.swing.JPanel();
-        stopButton = new javax.swing.JButton();
-        playPauseButton = new javax.swing.JButton();
+        jPanel13 = new javax.swing.JPanel();
+        jLabel1 = new javax.swing.JLabel();
+        jScrollPane1 = new javax.swing.JScrollPane();
+        jPanel5 = new javax.swing.JPanel();
+        foldablePanel3 = new com.nuwc.interestengine.gui.FoldablePanel();
+        jPanel7 = new javax.swing.JPanel();
+        trainNetworkButton = new javax.swing.JButton();
+        AnalysisSettingsPanel2 = new javax.swing.JPanel();
+        jTextField10 = new javax.swing.JTextField();
+        epochsField = new javax.swing.JTextField();
+        jTextField11 = new javax.swing.JTextField();
+        batchSizeField = new javax.swing.JTextField();
+        jTextField12 = new javax.swing.JTextField();
+        learningRateField = new javax.swing.JTextField();
+        jTextField13 = new javax.swing.JTextField();
+        jTextField14 = new javax.swing.JTextField();
+        foldablePanel5 = new com.nuwc.interestengine.gui.FoldablePanel();
         analysisPanel = new javax.swing.JPanel();
         extractRoutesButton = new javax.swing.JButton();
-        numberClustersLabel = new javax.swing.JLabel();
-        numberClustersField = new javax.swing.JTextField();
-        numberRoutesLabel = new javax.swing.JLabel();
-        numberRoutesField = new javax.swing.JTextField();
+        numClustersLabel = new javax.swing.JLabel();
+        numClustersField = new javax.swing.JTextField();
+        numRoutesLabel = new javax.swing.JLabel();
+        numRoutesField = new javax.swing.JTextField();
         AnalysisSettingsPanel = new javax.swing.JPanel();
-        minSpeedLabel = new javax.swing.JLabel();
-        entryEpsilonLabel = new javax.swing.JLabel();
-        lostTimeLabel = new javax.swing.JLabel();
-        entryMinPointsLabel = new javax.swing.JLabel();
-        stopEpsilonLabel = new javax.swing.JLabel();
-        exitEpsilonLabel = new javax.swing.JLabel();
-        stopMinPointsLabel = new javax.swing.JLabel();
-        exitMinPointsLabel = new javax.swing.JLabel();
+        jTextField1 = new javax.swing.JTextField();
         minSpeedField = new javax.swing.JTextField();
-        entryEpsilonField = new javax.swing.JTextField();
-        exitEpsilonField = new javax.swing.JTextField();
-        stopEpsilonField = new javax.swing.JTextField();
+        jTextField2 = new javax.swing.JTextField();
         lostTimeField = new javax.swing.JTextField();
+        jTextField3 = new javax.swing.JTextField();
+        entryEpsilonField = new javax.swing.JTextField();
+        jTextField4 = new javax.swing.JTextField();
         entryMinPointsField = new javax.swing.JTextField();
-        exitMinPointsField = new javax.swing.JTextField();
+        jTextField5 = new javax.swing.JTextField();
+        stopEpsilonField = new javax.swing.JTextField();
+        jTextField6 = new javax.swing.JTextField();
         stopMinPointsField = new javax.swing.JTextField();
-        displayPanel = new javax.swing.JPanel();
-        drawClustersBox = new javax.swing.JCheckBox();
-        drawRoutesBox = new javax.swing.JCheckBox();
-        drawEntryPointsBox = new javax.swing.JCheckBox();
-        drawExitPointsBox = new javax.swing.JCheckBox();
-        drawStopPointsBox = new javax.swing.JCheckBox();
-        drawDataPointsBox = new javax.swing.JCheckBox();
-        colorDataPointsButton = new javax.swing.JButton();
-        colorRoutesButton = new javax.swing.JButton();
-        colorClustersButton = new javax.swing.JButton();
-        colorEntryPointsButton = new javax.swing.JButton();
-        colorExitPointsButton = new javax.swing.JButton();
-        colorStopPointsButton = new javax.swing.JButton();
-        colorClustersBox = new javax.swing.JPanel();
-        colorRoutesBox = new javax.swing.JPanel();
-        colorDataPointsBox = new javax.swing.JPanel();
-        colorEntryPointsBox = new javax.swing.JPanel();
-        colorExitPointsBox = new javax.swing.JPanel();
-        colorStopPointsBox = new javax.swing.JPanel();
-        clustersModeCombo = new javax.swing.JComboBox<>();
-        routesModeCombo = new javax.swing.JComboBox<>();
-        jPanel1 = new javax.swing.JPanel();
-        trainNetworkButton = new javax.swing.JButton();
-        trainNetworkButton1 = new javax.swing.JButton();
+        jTextField7 = new javax.swing.JTextField();
+        exitEpsilonField = new javax.swing.JTextField();
+        jTextField8 = new javax.swing.JTextField();
+        exitMinPointsField = new javax.swing.JTextField();
+        filler1 = new javax.swing.Box.Filler(new java.awt.Dimension(0, 0), new java.awt.Dimension(0, 0), new java.awt.Dimension(0, 0));
+        jPanel14 = new javax.swing.JPanel();
+        jLabel2 = new javax.swing.JLabel();
+        jScrollPane5 = new javax.swing.JScrollPane();
+        jPanel12 = new javax.swing.JPanel();
+        foldablePanel4 = new com.nuwc.interestengine.gui.FoldablePanel();
+        jPanel8 = new javax.swing.JPanel();
+        jPanel9 = new javax.swing.JPanel();
+        jTextField9 = new javax.swing.JTextField();
+        jComboBox3 = new javax.swing.JComboBox<>();
+        jColorButton5 = new com.nuwc.interestengine.gui.JColorButton();
+        jTextField22 = new javax.swing.JTextField();
+        jComboBox4 = new javax.swing.JComboBox<>();
+        jColorButton2 = new com.nuwc.interestengine.gui.JColorButton();
+        jTextField23 = new javax.swing.JTextField();
+        jCheckBox4 = new javax.swing.JCheckBox();
+        jColorButton6 = new com.nuwc.interestengine.gui.JColorButton();
+        jTextField25 = new javax.swing.JTextField();
+        jCheckBox5 = new javax.swing.JCheckBox();
+        jColorButton7 = new com.nuwc.interestengine.gui.JColorButton();
+        jTextField27 = new javax.swing.JTextField();
+        jCheckBox6 = new javax.swing.JCheckBox();
+        jColorButton1 = new com.nuwc.interestengine.gui.JColorButton();
+        jTextField29 = new javax.swing.JTextField();
+        jCheckBox7 = new javax.swing.JCheckBox();
+        jColorButton3 = new com.nuwc.interestengine.gui.JColorButton();
+        foldablePanel2 = new com.nuwc.interestengine.gui.FoldablePanel();
+        jScrollPane6 = new javax.swing.JScrollPane();
+        jCheckBoxTree1 = new com.nuwc.interestengine.gui.JCheckBoxTree();
+        jPanel15 = new javax.swing.JPanel();
+        jLabel3 = new javax.swing.JLabel();
+        jScrollPane3 = new javax.swing.JScrollPane();
+        jPanel6 = new javax.swing.JPanel();
+        aisSimulationAccordion = new com.nuwc.interestengine.gui.FoldablePanel();
+        jPanel2 = new javax.swing.JPanel();
         runSimulationButton = new javax.swing.JButton();
+        numActiveVesselsLabel = new javax.swing.JLabel();
+        numActiveVesselsField = new javax.swing.JTextField();
+        shipTypesChart = new com.nuwc.interestengine.gui.JChartPanel();
+        jPanel16 = new javax.swing.JPanel();
+        jLabel4 = new javax.swing.JLabel();
+        jScrollPane4 = new javax.swing.JScrollPane();
+        jPanel11 = new javax.swing.JPanel();
+        jPanel17 = new javax.swing.JPanel();
+        jLabel5 = new javax.swing.JLabel();
 
+        setMinimumSize(new java.awt.Dimension(500, 300));
         setPreferredSize(new java.awt.Dimension(500, 800));
 
-        mainScroller.getVerticalScrollBar().setUnitIncrement(16);
-        mainScroller.setPreferredSize(new java.awt.Dimension(400, 2000));
+        jTabbedPane1.setPreferredSize(new java.awt.Dimension(720, 1080));
 
-        mainScrollerPanel.setPreferredSize(new java.awt.Dimension(400, 1200));
+        jScrollPane2.getVerticalScrollBar().setUnitIncrement(16);
+        jScrollPane2.setVerticalScrollBarPolicy(javax.swing.ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
+        jScrollPane2.setPreferredSize(new java.awt.Dimension(600, 1837));
 
-        databasePanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Database"));
+        jPanel3.setPreferredSize(new java.awt.Dimension(500, 2073));
+
+        databaseAccordion.setTitle("Database");
+        databaseAccordion.setTitle("Target Region");
 
         loadDataButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/add_icon.png"))); // NOI18N
         loadDataButton.setText("Load Data");
@@ -338,6 +517,133 @@ public class OptionsPanel extends javax.swing.JPanel
                 loadDataButtonActionPerformed(evt);
             }
         });
+
+        numAISPointsLabel.setText("Number of Messages:");
+
+        numAISPointsField.setEditable(false);
+
+        numVesselsLabel.setText("Number of Vessels:");
+
+        numVesselsField.setEditable(false);
+        numVesselsField.addActionListener(new java.awt.event.ActionListener()
+        {
+            public void actionPerformed(java.awt.event.ActionEvent evt)
+            {
+                numVesselsFieldActionPerformed(evt);
+            }
+        });
+
+        jPanel1.setLayout(new java.awt.GridLayout(4, 4));
+
+        jTextField17.setEditable(false);
+        jTextField17.setBackground(new java.awt.Color(255, 255, 255));
+        jTextField17.setText("Min Lat.");
+        jPanel1.add(jTextField17);
+
+        minLatSpinner.setModel(new SpinnerNumberModel(42, -180, 180, 0.5));
+        minLatSpinner.addChangeListener(new javax.swing.event.ChangeListener()
+        {
+            public void stateChanged(javax.swing.event.ChangeEvent evt)
+            {
+                minLatSpinnerStateChanged(evt);
+            }
+        });
+        jPanel1.add(minLatSpinner);
+
+        jTextField18.setEditable(false);
+        jTextField18.setBackground(new java.awt.Color(255, 255, 255));
+        jTextField18.setText("Max Lat.");
+        jPanel1.add(jTextField18);
+
+        maxLatSpinner.setModel(new SpinnerNumberModel(47, -180, 180, 0.5));
+        maxLatSpinner.addChangeListener(new javax.swing.event.ChangeListener()
+        {
+            public void stateChanged(javax.swing.event.ChangeEvent evt)
+            {
+                maxLatSpinnerStateChanged(evt);
+            }
+        });
+        jPanel1.add(maxLatSpinner);
+
+        jTextField19.setEditable(false);
+        jTextField19.setBackground(new java.awt.Color(255, 255, 255));
+        jTextField19.setText("Min Lon.");
+        jPanel1.add(jTextField19);
+
+        minLonSpinner.setModel(new SpinnerNumberModel(10, -180, 180, 0.5));
+        minLonSpinner.addChangeListener(new javax.swing.event.ChangeListener()
+        {
+            public void stateChanged(javax.swing.event.ChangeEvent evt)
+            {
+                minLonSpinnerStateChanged(evt);
+            }
+        });
+        jPanel1.add(minLonSpinner);
+
+        jTextField20.setEditable(false);
+        jTextField20.setBackground(new java.awt.Color(255, 255, 255));
+        jTextField20.setText("Max Lon.");
+        jPanel1.add(jTextField20);
+
+        maxLonSpinner.setModel(new SpinnerNumberModel(18, -180, 180, 0.5));
+        maxLonSpinner.addChangeListener(new javax.swing.event.ChangeListener()
+        {
+            public void stateChanged(javax.swing.event.ChangeEvent evt)
+            {
+                maxLonSpinnerStateChanged(evt);
+            }
+        });
+        jPanel1.add(maxLonSpinner);
+
+        miniMapPanel.setMap(miniMap, minLatSpinner, minLonSpinner,
+            maxLatSpinner, maxLonSpinner, this);
+        miniMapPanel.setBorder(javax.swing.BorderFactory.createEtchedBorder());
+
+        javax.swing.GroupLayout jPanel4Layout = new javax.swing.GroupLayout(jPanel4);
+        jPanel4.setLayout(jPanel4Layout);
+        jPanel4Layout.setHorizontalGroup(
+            jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel4Layout.createSequentialGroup()
+                .addContainerGap()
+                .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addGroup(jPanel4Layout.createSequentialGroup()
+                        .addComponent(loadDataButton, javax.swing.GroupLayout.PREFERRED_SIZE, 130, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 306, Short.MAX_VALUE)
+                        .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(numAISPointsLabel)
+                            .addComponent(numVesselsLabel))
+                        .addGap(18, 18, 18)
+                        .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(numAISPointsField, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, 100, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(numVesselsField, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, 100, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                    .addComponent(miniMapPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addContainerGap())
+        );
+        jPanel4Layout.setVerticalGroup(
+            jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel4Layout.createSequentialGroup()
+                .addContainerGap()
+                .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanel4Layout.createSequentialGroup()
+                        .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(numAISPointsLabel)
+                            .addComponent(numAISPointsField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(numVesselsLabel)
+                            .addComponent(numVesselsField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                    .addComponent(loadDataButton, javax.swing.GroupLayout.PREFERRED_SIZE, 41, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addGap(18, 18, 18)
+                .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(18, 18, 18)
+                .addComponent(miniMapPanel, javax.swing.GroupLayout.PREFERRED_SIZE, 229, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+        );
+
+        databaseAccordion.add(jPanel4, java.awt.BorderLayout.CENTER);
+
+        foldablePanel1.setTitle("Parsed Data");
 
         vesselDataTable.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][]
@@ -363,169 +669,164 @@ public class OptionsPanel extends javax.swing.JPanel
         vesselDataTable.setFillsViewportHeight(true);
         vesselDataScroller.setViewportView(vesselDataTable);
 
-        databaseTabs.addTab("Vessel Data", vesselDataScroller);
-
-        numberAISPointsLabel.setText("Number of AIS Points:");
-
-        numberVesselsLabel.setText("Number of Vessels:");
-
-        numberAISPointsField.setEditable(false);
-
-        numberVesselsField.setEditable(false);
-
-        DatabaseSettingsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Settings"));
-
-        minLatLabel.setText("Min Lat:");
-
-        maxLatLabel.setText("Max Lat:");
-
-        minLatSpinner.setModel(new SpinnerNumberModel(42, -180, 180, 0.5));
-
-        maxLatSpinner.setModel(new SpinnerNumberModel(47, -180, 180, 0.5));
-
-        minLonLabel.setText("Min Lon:");
-
-        minLonSpinner.setModel(new SpinnerNumberModel(10, -180, 180, 0.5));
-
-        maxLonLabel.setText("Max Lon:");
-
-        maxLonSpinner.setModel(new SpinnerNumberModel(18, -180, 180, 0.5));
-
-        javax.swing.GroupLayout DatabaseSettingsPanelLayout = new javax.swing.GroupLayout(DatabaseSettingsPanel);
-        DatabaseSettingsPanel.setLayout(DatabaseSettingsPanelLayout);
-        DatabaseSettingsPanelLayout.setHorizontalGroup(
-            DatabaseSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(DatabaseSettingsPanelLayout.createSequentialGroup()
+        javax.swing.GroupLayout jPanel10Layout = new javax.swing.GroupLayout(jPanel10);
+        jPanel10.setLayout(jPanel10Layout);
+        jPanel10Layout.setHorizontalGroup(
+            jPanel10Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel10Layout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(DatabaseSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(maxLatLabel)
-                    .addComponent(minLatLabel))
-                .addGap(18, 18, 18)
-                .addGroup(DatabaseSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                    .addComponent(minLatSpinner, javax.swing.GroupLayout.DEFAULT_SIZE, 59, Short.MAX_VALUE)
-                    .addComponent(maxLatSpinner))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addGroup(DatabaseSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(maxLonLabel)
-                    .addComponent(minLonLabel))
-                .addGap(18, 18, 18)
-                .addGroup(DatabaseSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                    .addComponent(minLonSpinner)
-                    .addComponent(maxLonSpinner, javax.swing.GroupLayout.PREFERRED_SIZE, 59, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addComponent(vesselDataScroller, javax.swing.GroupLayout.DEFAULT_SIZE, 658, Short.MAX_VALUE)
                 .addContainerGap())
         );
-        DatabaseSettingsPanelLayout.setVerticalGroup(
-            DatabaseSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(DatabaseSettingsPanelLayout.createSequentialGroup()
+        jPanel10Layout.setVerticalGroup(
+            jPanel10Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel10Layout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(DatabaseSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(DatabaseSettingsPanelLayout.createSequentialGroup()
-                        .addGroup(DatabaseSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(minLonLabel)
-                            .addComponent(minLonSpinner, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addGroup(DatabaseSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(maxLonLabel)
-                            .addComponent(maxLonSpinner, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                    .addGroup(DatabaseSettingsPanelLayout.createSequentialGroup()
-                        .addGroup(DatabaseSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(minLatLabel)
-                            .addComponent(minLatSpinner, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addGroup(DatabaseSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(maxLatLabel)
-                            .addComponent(maxLatSpinner, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))))
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-        );
-
-        javax.swing.GroupLayout databasePanelLayout = new javax.swing.GroupLayout(databasePanel);
-        databasePanel.setLayout(databasePanelLayout);
-        databasePanelLayout.setHorizontalGroup(
-            databasePanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(databasePanelLayout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(databasePanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(DatabaseSettingsPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, databasePanelLayout.createSequentialGroup()
-                        .addComponent(loadDataButton, javax.swing.GroupLayout.PREFERRED_SIZE, 130, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(18, 18, Short.MAX_VALUE)
-                        .addGroup(databasePanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(numberAISPointsLabel)
-                            .addComponent(numberVesselsLabel))
-                        .addGap(18, 18, 18)
-                        .addGroup(databasePanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(numberAISPointsField, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, 100, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(numberVesselsField, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, 100, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                    .addComponent(databaseTabs, javax.swing.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE))
+                .addComponent(vesselDataScroller, javax.swing.GroupLayout.DEFAULT_SIZE, 290, Short.MAX_VALUE)
                 .addContainerGap())
         );
-        databasePanelLayout.setVerticalGroup(
-            databasePanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(databasePanelLayout.createSequentialGroup()
+
+        foldablePanel1.add(jPanel10, java.awt.BorderLayout.CENTER);
+
+        jPanel13.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0)));
+        jPanel13.setLayout(new java.awt.BorderLayout());
+
+        jLabel1.setBackground(new java.awt.Color(255, 255, 255));
+        jLabel1.setFont(new java.awt.Font("Times New Roman", 1, 18)); // NOI18N
+        jLabel1.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        jLabel1.setText("Database");
+        jPanel13.add(jLabel1, java.awt.BorderLayout.CENTER);
+
+        javax.swing.GroupLayout jPanel3Layout = new javax.swing.GroupLayout(jPanel3);
+        jPanel3.setLayout(jPanel3Layout);
+        jPanel3Layout.setHorizontalGroup(
+            jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel3Layout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(databasePanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(loadDataButton, javax.swing.GroupLayout.PREFERRED_SIZE, 41, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addGroup(databasePanelLayout.createSequentialGroup()
-                        .addGroup(databasePanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(numberAISPointsLabel)
-                            .addComponent(numberAISPointsField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addGroup(databasePanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(numberVesselsLabel)
-                            .addComponent(numberVesselsField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))))
+                .addGroup(jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanel3Layout.createSequentialGroup()
+                        .addComponent(jPanel13, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addContainerGap())
+                    .addComponent(foldablePanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(databaseAccordion, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
+        );
+        jPanel3Layout.setVerticalGroup(
+            jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel3Layout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(jPanel13, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(DatabaseSettingsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, 94, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(databaseTabs, javax.swing.GroupLayout.DEFAULT_SIZE, 237, Short.MAX_VALUE)
-                .addContainerGap())
+                .addComponent(databaseAccordion, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(foldablePanel1, javax.swing.GroupLayout.PREFERRED_SIZE, 332, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(1242, Short.MAX_VALUE))
         );
 
-        simulationPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Simulation"));
+        jScrollPane2.setViewportView(jPanel3);
 
-        stopButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/route-stop.png"))); // NOI18N
-        stopButton.setText("Stop");
-        stopButton.setEnabled(false);
-        stopButton.addActionListener(new java.awt.event.ActionListener()
+        jTabbedPane1.addTab("", new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/2017-04-17_02h30_26.png")), jScrollPane2, "Database"); // NOI18N
+
+        jScrollPane1.getVerticalScrollBar().setUnitIncrement(16);
+        jScrollPane1.setVerticalScrollBarPolicy(javax.swing.ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
+        jScrollPane1.setPreferredSize(new java.awt.Dimension(600, 2058));
+
+        jPanel5.setPreferredSize(new java.awt.Dimension(500, 2056));
+
+        foldablePanel3.setTitle("Kernel Density Estimation");
+
+        trainNetworkButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/convert_icon.png"))); // NOI18N
+        trainNetworkButton.setText("Train Estimator");
+        trainNetworkButton.addActionListener(new java.awt.event.ActionListener()
         {
             public void actionPerformed(java.awt.event.ActionEvent evt)
             {
-                stopButtonActionPerformed(evt);
+                trainNetworkButtonActionPerformed(evt);
             }
         });
 
-        playPauseButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/route-play.png"))); // NOI18N
-        playPauseButton.setText("Play");
-        playPauseButton.setEnabled(false);
-        playPauseButton.addActionListener(new java.awt.event.ActionListener()
+        AnalysisSettingsPanel2.setLayout(new java.awt.GridLayout(4, 2));
+
+        jTextField10.setEditable(false);
+        jTextField10.setBackground(new java.awt.Color(255, 255, 255));
+        jTextField10.setText("Forgetting Factor");
+        AnalysisSettingsPanel2.add(jTextField10);
+
+        epochsField.setText("1");
+        epochsField.addActionListener(new java.awt.event.ActionListener()
         {
             public void actionPerformed(java.awt.event.ActionEvent evt)
             {
-                playPauseButtonActionPerformed(evt);
+                epochsFieldActionPerformed(evt);
             }
         });
+        AnalysisSettingsPanel2.add(epochsField);
 
-        javax.swing.GroupLayout simulationPanelLayout = new javax.swing.GroupLayout(simulationPanel);
-        simulationPanel.setLayout(simulationPanelLayout);
-        simulationPanelLayout.setHorizontalGroup(
-            simulationPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(simulationPanelLayout.createSequentialGroup()
+        jTextField11.setEditable(false);
+        jTextField11.setBackground(new java.awt.Color(255, 255, 255));
+        jTextField11.setText("Compression Threshold");
+        AnalysisSettingsPanel2.add(jTextField11);
+
+        batchSizeField.setText("0.02");
+        batchSizeField.addActionListener(new java.awt.event.ActionListener()
+        {
+            public void actionPerformed(java.awt.event.ActionEvent evt)
+            {
+                batchSizeFieldActionPerformed(evt);
+            }
+        });
+        AnalysisSettingsPanel2.add(batchSizeField);
+
+        jTextField12.setEditable(false);
+        jTextField12.setBackground(new java.awt.Color(255, 255, 255));
+        jTextField12.setText("Number of Samples");
+        AnalysisSettingsPanel2.add(jTextField12);
+
+        learningRateField.setText("100");
+        AnalysisSettingsPanel2.add(learningRateField);
+
+        jTextField13.setEditable(false);
+        jTextField13.setBackground(new java.awt.Color(255, 255, 255));
+        jTextField13.setText("Neighborhood Radius");
+        AnalysisSettingsPanel2.add(jTextField13);
+
+        jTextField14.setEditable(false);
+        jTextField14.setBackground(new java.awt.Color(255, 255, 255));
+        jTextField14.setText("1.5");
+        jTextField14.addActionListener(new java.awt.event.ActionListener()
+        {
+            public void actionPerformed(java.awt.event.ActionEvent evt)
+            {
+                jTextField14ActionPerformed(evt);
+            }
+        });
+        AnalysisSettingsPanel2.add(jTextField14);
+
+        javax.swing.GroupLayout jPanel7Layout = new javax.swing.GroupLayout(jPanel7);
+        jPanel7.setLayout(jPanel7Layout);
+        jPanel7Layout.setHorizontalGroup(
+            jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel7Layout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(playPauseButton, javax.swing.GroupLayout.PREFERRED_SIZE, 130, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanel7Layout.createSequentialGroup()
+                        .addComponent(trainNetworkButton)
+                        .addGap(0, 0, Short.MAX_VALUE))
+                    .addComponent(AnalysisSettingsPanel2, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 658, Short.MAX_VALUE))
+                .addContainerGap())
+        );
+        jPanel7Layout.setVerticalGroup(
+            jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel7Layout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(trainNetworkButton, javax.swing.GroupLayout.PREFERRED_SIZE, 41, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(18, 18, 18)
-                .addComponent(stopButton, javax.swing.GroupLayout.PREFERRED_SIZE, 130, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-        );
-        simulationPanelLayout.setVerticalGroup(
-            simulationPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(simulationPanelLayout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(simulationPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                    .addComponent(playPauseButton, javax.swing.GroupLayout.DEFAULT_SIZE, 41, Short.MAX_VALUE)
-                    .addComponent(stopButton, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addComponent(AnalysisSettingsPanel2, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addContainerGap())
         );
 
-        analysisPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Analysis"));
+        foldablePanel3.add(jPanel7, java.awt.BorderLayout.CENTER);
+
+        foldablePanel5.setTitle("Route Extraction");
 
         extractRoutesButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/output_icon.png"))); // NOI18N
         extractRoutesButton.setText("Extract Routes");
@@ -537,33 +838,36 @@ public class OptionsPanel extends javax.swing.JPanel
             }
         });
 
-        numberClustersLabel.setText("Number of Clusters:");
+        numClustersLabel.setText("Number of Clusters:");
 
-        numberClustersField.setEditable(false);
+        numClustersField.setEditable(false);
 
-        numberRoutesLabel.setText("Number of Routes:");
+        numRoutesLabel.setText("Number of Routes:");
 
-        numberRoutesField.setEditable(false);
+        numRoutesField.setEditable(false);
 
-        AnalysisSettingsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Settings"));
+        AnalysisSettingsPanel.setLayout(new java.awt.GridLayout(8, 2));
 
-        minSpeedLabel.setText("Min Speed:");
-
-        entryEpsilonLabel.setText("Entry Eps:");
-
-        lostTimeLabel.setText("Lost Time:");
-
-        entryMinPointsLabel.setText("Entry Min Pts:");
-
-        stopEpsilonLabel.setText("Stop Eps:");
-
-        exitEpsilonLabel.setText("Exit Eps:");
-
-        stopMinPointsLabel.setText("Stop Min Pts:");
-
-        exitMinPointsLabel.setText("Exit Min Pts:");
+        jTextField1.setEditable(false);
+        jTextField1.setBackground(new java.awt.Color(255, 255, 255));
+        jTextField1.setText("Min Speed");
+        AnalysisSettingsPanel.add(jTextField1);
 
         minSpeedField.setText("1");
+        AnalysisSettingsPanel.add(minSpeedField);
+
+        jTextField2.setEditable(false);
+        jTextField2.setBackground(new java.awt.Color(255, 255, 255));
+        jTextField2.setText("Lost Time");
+        AnalysisSettingsPanel.add(jTextField2);
+
+        lostTimeField.setText("100");
+        AnalysisSettingsPanel.add(lostTimeField);
+
+        jTextField3.setEditable(false);
+        jTextField3.setBackground(new java.awt.Color(255, 255, 255));
+        jTextField3.setText("Entry Epsilon");
+        AnalysisSettingsPanel.add(jTextField3);
 
         entryEpsilonField.setText("3");
         entryEpsilonField.addActionListener(new java.awt.event.ActionListener()
@@ -573,102 +877,47 @@ public class OptionsPanel extends javax.swing.JPanel
                 entryEpsilonFieldActionPerformed(evt);
             }
         });
+        AnalysisSettingsPanel.add(entryEpsilonField);
 
-        exitEpsilonField.setText("3");
-
-        stopEpsilonField.setText("3");
-
-        lostTimeField.setText("100");
+        jTextField4.setEditable(false);
+        jTextField4.setBackground(new java.awt.Color(255, 255, 255));
+        jTextField4.setText("Entry Min Points");
+        AnalysisSettingsPanel.add(jTextField4);
 
         entryMinPointsField.setText("5");
+        AnalysisSettingsPanel.add(entryMinPointsField);
 
-        exitMinPointsField.setText("5");
+        jTextField5.setEditable(false);
+        jTextField5.setBackground(new java.awt.Color(255, 255, 255));
+        jTextField5.setText("Stop Epsilon");
+        AnalysisSettingsPanel.add(jTextField5);
+
+        stopEpsilonField.setText("3");
+        AnalysisSettingsPanel.add(stopEpsilonField);
+
+        jTextField6.setEditable(false);
+        jTextField6.setBackground(new java.awt.Color(255, 255, 255));
+        jTextField6.setText("Stop Min Points");
+        AnalysisSettingsPanel.add(jTextField6);
 
         stopMinPointsField.setText("5");
+        AnalysisSettingsPanel.add(stopMinPointsField);
 
-        javax.swing.GroupLayout AnalysisSettingsPanelLayout = new javax.swing.GroupLayout(AnalysisSettingsPanel);
-        AnalysisSettingsPanel.setLayout(AnalysisSettingsPanelLayout);
-        AnalysisSettingsPanelLayout.setHorizontalGroup(
-            AnalysisSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(AnalysisSettingsPanelLayout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(AnalysisSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                    .addGroup(AnalysisSettingsPanelLayout.createSequentialGroup()
-                        .addComponent(stopEpsilonLabel)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 25, Short.MAX_VALUE)
-                        .addComponent(stopEpsilonField, javax.swing.GroupLayout.PREFERRED_SIZE, 59, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addGroup(AnalysisSettingsPanelLayout.createSequentialGroup()
-                        .addComponent(exitEpsilonLabel)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addComponent(exitEpsilonField, javax.swing.GroupLayout.PREFERRED_SIZE, 59, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addGroup(AnalysisSettingsPanelLayout.createSequentialGroup()
-                        .addGroup(AnalysisSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(entryEpsilonLabel)
-                            .addComponent(minSpeedLabel))
-                        .addGap(18, 18, 18)
-                        .addGroup(AnalysisSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(entryEpsilonField, javax.swing.GroupLayout.DEFAULT_SIZE, 59, Short.MAX_VALUE)
-                            .addComponent(minSpeedField))))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addGroup(AnalysisSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, AnalysisSettingsPanelLayout.createSequentialGroup()
-                        .addComponent(lostTimeLabel)
-                        .addGap(36, 36, 36))
-                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, AnalysisSettingsPanelLayout.createSequentialGroup()
-                        .addComponent(entryMinPointsLabel)
-                        .addGap(18, 18, 18))
-                    .addGroup(AnalysisSettingsPanelLayout.createSequentialGroup()
-                        .addGroup(AnalysisSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(exitMinPointsLabel)
-                            .addComponent(stopMinPointsLabel))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)))
-                .addGroup(AnalysisSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                    .addComponent(stopMinPointsField, javax.swing.GroupLayout.PREFERRED_SIZE, 59, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(exitMinPointsField, javax.swing.GroupLayout.PREFERRED_SIZE, 59, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addGroup(AnalysisSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                        .addComponent(lostTimeField, javax.swing.GroupLayout.PREFERRED_SIZE, 59, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addComponent(entryMinPointsField, javax.swing.GroupLayout.PREFERRED_SIZE, 59, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                .addContainerGap())
-        );
-        AnalysisSettingsPanelLayout.setVerticalGroup(
-            AnalysisSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(AnalysisSettingsPanelLayout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(AnalysisSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(AnalysisSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                        .addComponent(lostTimeField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addComponent(lostTimeLabel))
-                    .addGroup(AnalysisSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                        .addComponent(minSpeedField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addComponent(minSpeedLabel)))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addGroup(AnalysisSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(AnalysisSettingsPanelLayout.createSequentialGroup()
-                        .addGroup(AnalysisSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(entryMinPointsField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(entryMinPointsLabel))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addGroup(AnalysisSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(exitMinPointsField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(exitMinPointsLabel))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addGroup(AnalysisSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(stopMinPointsField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(stopMinPointsLabel)))
-                    .addGroup(AnalysisSettingsPanelLayout.createSequentialGroup()
-                        .addGroup(AnalysisSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(entryEpsilonLabel)
-                            .addComponent(entryEpsilonField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addGroup(AnalysisSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(exitEpsilonLabel)
-                            .addComponent(exitEpsilonField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addGroup(AnalysisSettingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(stopEpsilonLabel)
-                            .addComponent(stopEpsilonField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))))
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-        );
+        jTextField7.setEditable(false);
+        jTextField7.setBackground(new java.awt.Color(255, 255, 255));
+        jTextField7.setText("Exit Epsilon");
+        AnalysisSettingsPanel.add(jTextField7);
+
+        exitEpsilonField.setText("3");
+        AnalysisSettingsPanel.add(exitEpsilonField);
+
+        jTextField8.setEditable(false);
+        jTextField8.setBackground(new java.awt.Color(255, 255, 255));
+        jTextField8.setText("Exit Min Points");
+        AnalysisSettingsPanel.add(jTextField8);
+
+        exitMinPointsField.setText("5");
+        AnalysisSettingsPanel.add(exitMinPointsField);
 
         javax.swing.GroupLayout analysisPanelLayout = new javax.swing.GroupLayout(analysisPanel);
         analysisPanel.setLayout(analysisPanelLayout);
@@ -679,14 +928,14 @@ public class OptionsPanel extends javax.swing.JPanel
                 .addGroup(analysisPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(analysisPanelLayout.createSequentialGroup()
                         .addComponent(extractRoutesButton)
-                        .addGap(18, 18, Short.MAX_VALUE)
+                        .addGap(18, 317, Short.MAX_VALUE)
                         .addGroup(analysisPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(numberClustersLabel)
-                            .addComponent(numberRoutesLabel))
+                            .addComponent(numClustersLabel)
+                            .addComponent(numRoutesLabel))
                         .addGap(18, 18, 18)
                         .addGroup(analysisPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(numberClustersField, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, 100, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(numberRoutesField, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, 100, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                            .addComponent(numClustersField, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, 100, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(numRoutesField, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, 100, javax.swing.GroupLayout.PREFERRED_SIZE)))
                     .addComponent(AnalysisSettingsPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                 .addContainerGap())
         );
@@ -697,341 +946,420 @@ public class OptionsPanel extends javax.swing.JPanel
                 .addGroup(analysisPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(analysisPanelLayout.createSequentialGroup()
                         .addGroup(analysisPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(numberClustersLabel)
-                            .addComponent(numberClustersField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                            .addComponent(numClustersLabel)
+                            .addComponent(numClustersField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(analysisPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(numberRoutesLabel)
-                            .addComponent(numberRoutesField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                            .addComponent(numRoutesLabel)
+                            .addComponent(numRoutesField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
                     .addComponent(extractRoutesButton, javax.swing.GroupLayout.PREFERRED_SIZE, 41, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addGap(18, 18, 18)
                 .addComponent(AnalysisSettingsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
-        displayPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Display"));
+        foldablePanel5.add(analysisPanel, java.awt.BorderLayout.CENTER);
 
-        drawClustersBox.setText("Clusters");
-        drawClustersBox.addActionListener(new java.awt.event.ActionListener()
-        {
-            public void actionPerformed(java.awt.event.ActionEvent evt)
-            {
-                drawClustersBoxActionPerformed(evt);
-            }
-        });
+        jPanel14.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0)));
+        jPanel14.setLayout(new java.awt.BorderLayout());
 
-        drawRoutesBox.setSelected(true);
-        drawRoutesBox.setText("Routes");
-        drawRoutesBox.addActionListener(new java.awt.event.ActionListener()
-        {
-            public void actionPerformed(java.awt.event.ActionEvent evt)
-            {
-                drawRoutesBoxActionPerformed(evt);
-            }
-        });
+        jLabel2.setBackground(new java.awt.Color(255, 255, 255));
+        jLabel2.setFont(new java.awt.Font("Times New Roman", 1, 18)); // NOI18N
+        jLabel2.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        jLabel2.setText("Analysis");
+        jPanel14.add(jLabel2, java.awt.BorderLayout.CENTER);
 
-        drawEntryPointsBox.setText("Entry Points");
-        drawEntryPointsBox.addActionListener(new java.awt.event.ActionListener()
-        {
-            public void actionPerformed(java.awt.event.ActionEvent evt)
-            {
-                drawEntryPointsBoxActionPerformed(evt);
-            }
-        });
-
-        drawExitPointsBox.setText("Exit Points");
-        drawExitPointsBox.addActionListener(new java.awt.event.ActionListener()
-        {
-            public void actionPerformed(java.awt.event.ActionEvent evt)
-            {
-                drawExitPointsBoxActionPerformed(evt);
-            }
-        });
-
-        drawStopPointsBox.setText("Stop Points");
-        drawStopPointsBox.addActionListener(new java.awt.event.ActionListener()
-        {
-            public void actionPerformed(java.awt.event.ActionEvent evt)
-            {
-                drawStopPointsBoxActionPerformed(evt);
-            }
-        });
-
-        drawDataPointsBox.setText("Data Points");
-        drawDataPointsBox.addActionListener(new java.awt.event.ActionListener()
-        {
-            public void actionPerformed(java.awt.event.ActionEvent evt)
-            {
-                drawDataPointsBoxActionPerformed(evt);
-            }
-        });
-
-        colorDataPointsButton.setText("Color");
-        colorDataPointsButton.addActionListener(new java.awt.event.ActionListener()
-        {
-            public void actionPerformed(java.awt.event.ActionEvent evt)
-            {
-                colorDataPointsButtonActionPerformed(evt);
-            }
-        });
-
-        colorRoutesButton.setText("Color");
-        colorRoutesButton.addActionListener(new java.awt.event.ActionListener()
-        {
-            public void actionPerformed(java.awt.event.ActionEvent evt)
-            {
-                colorRoutesButtonActionPerformed(evt);
-            }
-        });
-
-        colorClustersButton.setText("Color");
-        colorClustersButton.addActionListener(new java.awt.event.ActionListener()
-        {
-            public void actionPerformed(java.awt.event.ActionEvent evt)
-            {
-                colorClustersButtonActionPerformed(evt);
-            }
-        });
-
-        colorEntryPointsButton.setText("Color");
-        colorEntryPointsButton.addActionListener(new java.awt.event.ActionListener()
-        {
-            public void actionPerformed(java.awt.event.ActionEvent evt)
-            {
-                colorEntryPointsButtonActionPerformed(evt);
-            }
-        });
-
-        colorExitPointsButton.setText("Color");
-        colorExitPointsButton.addActionListener(new java.awt.event.ActionListener()
-        {
-            public void actionPerformed(java.awt.event.ActionEvent evt)
-            {
-                colorExitPointsButtonActionPerformed(evt);
-            }
-        });
-
-        colorStopPointsButton.setText("Color");
-        colorStopPointsButton.addActionListener(new java.awt.event.ActionListener()
-        {
-            public void actionPerformed(java.awt.event.ActionEvent evt)
-            {
-                colorStopPointsButtonActionPerformed(evt);
-            }
-        });
-
-        colorClustersBox.setBorder(javax.swing.BorderFactory.createEtchedBorder());
-
-        javax.swing.GroupLayout colorClustersBoxLayout = new javax.swing.GroupLayout(colorClustersBox);
-        colorClustersBox.setLayout(colorClustersBoxLayout);
-        colorClustersBoxLayout.setHorizontalGroup(
-            colorClustersBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 23, Short.MAX_VALUE)
-        );
-        colorClustersBoxLayout.setVerticalGroup(
-            colorClustersBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 0, Short.MAX_VALUE)
-        );
-
-        colorRoutesBox.setBorder(javax.swing.BorderFactory.createEtchedBorder());
-
-        javax.swing.GroupLayout colorRoutesBoxLayout = new javax.swing.GroupLayout(colorRoutesBox);
-        colorRoutesBox.setLayout(colorRoutesBoxLayout);
-        colorRoutesBoxLayout.setHorizontalGroup(
-            colorRoutesBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 23, Short.MAX_VALUE)
-        );
-        colorRoutesBoxLayout.setVerticalGroup(
-            colorRoutesBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 0, Short.MAX_VALUE)
-        );
-
-        colorDataPointsBox.setBorder(javax.swing.BorderFactory.createEtchedBorder());
-
-        javax.swing.GroupLayout colorDataPointsBoxLayout = new javax.swing.GroupLayout(colorDataPointsBox);
-        colorDataPointsBox.setLayout(colorDataPointsBoxLayout);
-        colorDataPointsBoxLayout.setHorizontalGroup(
-            colorDataPointsBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 23, Short.MAX_VALUE)
-        );
-        colorDataPointsBoxLayout.setVerticalGroup(
-            colorDataPointsBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 0, Short.MAX_VALUE)
-        );
-
-        colorEntryPointsBox.setBorder(javax.swing.BorderFactory.createEtchedBorder());
-
-        javax.swing.GroupLayout colorEntryPointsBoxLayout = new javax.swing.GroupLayout(colorEntryPointsBox);
-        colorEntryPointsBox.setLayout(colorEntryPointsBoxLayout);
-        colorEntryPointsBoxLayout.setHorizontalGroup(
-            colorEntryPointsBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 23, Short.MAX_VALUE)
-        );
-        colorEntryPointsBoxLayout.setVerticalGroup(
-            colorEntryPointsBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 21, Short.MAX_VALUE)
-        );
-
-        colorExitPointsBox.setBorder(javax.swing.BorderFactory.createEtchedBorder());
-
-        javax.swing.GroupLayout colorExitPointsBoxLayout = new javax.swing.GroupLayout(colorExitPointsBox);
-        colorExitPointsBox.setLayout(colorExitPointsBoxLayout);
-        colorExitPointsBoxLayout.setHorizontalGroup(
-            colorExitPointsBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 23, Short.MAX_VALUE)
-        );
-        colorExitPointsBoxLayout.setVerticalGroup(
-            colorExitPointsBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 19, Short.MAX_VALUE)
-        );
-
-        colorStopPointsBox.setBorder(javax.swing.BorderFactory.createEtchedBorder());
-
-        javax.swing.GroupLayout colorStopPointsBoxLayout = new javax.swing.GroupLayout(colorStopPointsBox);
-        colorStopPointsBox.setLayout(colorStopPointsBoxLayout);
-        colorStopPointsBoxLayout.setHorizontalGroup(
-            colorStopPointsBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 23, Short.MAX_VALUE)
-        );
-        colorStopPointsBoxLayout.setVerticalGroup(
-            colorStopPointsBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 19, Short.MAX_VALUE)
-        );
-
-        clustersModeCombo.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Single Color", "Rainbow", "With Points", "Connected" }));
-        clustersModeCombo.addActionListener(new java.awt.event.ActionListener()
-        {
-            public void actionPerformed(java.awt.event.ActionEvent evt)
-            {
-                clustersModeComboActionPerformed(evt);
-            }
-        });
-
-        routesModeCombo.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Rainbow", "Single Color" }));
-        routesModeCombo.addActionListener(new java.awt.event.ActionListener()
-        {
-            public void actionPerformed(java.awt.event.ActionEvent evt)
-            {
-                routesModeComboActionPerformed(evt);
-            }
-        });
-
-        javax.swing.GroupLayout displayPanelLayout = new javax.swing.GroupLayout(displayPanel);
-        displayPanel.setLayout(displayPanelLayout);
-        displayPanelLayout.setHorizontalGroup(
-            displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(displayPanelLayout.createSequentialGroup()
+        javax.swing.GroupLayout jPanel5Layout = new javax.swing.GroupLayout(jPanel5);
+        jPanel5.setLayout(jPanel5Layout);
+        jPanel5Layout.setHorizontalGroup(
+            jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel5Layout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(drawClustersBox)
-                    .addComponent(drawRoutesBox)
-                    .addComponent(drawDataPointsBox)
-                    .addComponent(drawEntryPointsBox)
-                    .addComponent(drawExitPointsBox)
-                    .addComponent(drawStopPointsBox))
-                .addGap(32, 32, 32)
-                .addGroup(displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(displayPanelLayout.createSequentialGroup()
-                        .addComponent(colorStopPointsButton)
-                        .addGap(18, 18, 18)
-                        .addComponent(colorStopPointsBox, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addGroup(displayPanelLayout.createSequentialGroup()
-                        .addComponent(colorExitPointsButton)
-                        .addGap(18, 18, 18)
-                        .addComponent(colorExitPointsBox, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addGroup(displayPanelLayout.createSequentialGroup()
-                        .addComponent(colorClustersButton)
-                        .addGap(18, 18, 18)
-                        .addComponent(colorClustersBox, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(18, 18, 18)
-                        .addComponent(clustersModeCombo, javax.swing.GroupLayout.PREFERRED_SIZE, 100, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addGroup(displayPanelLayout.createSequentialGroup()
-                        .addComponent(colorRoutesButton)
-                        .addGap(18, 18, 18)
-                        .addComponent(colorRoutesBox, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(18, 18, 18)
-                        .addComponent(routesModeCombo, javax.swing.GroupLayout.PREFERRED_SIZE, 100, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addGroup(displayPanelLayout.createSequentialGroup()
-                        .addComponent(colorDataPointsButton)
-                        .addGap(18, 18, 18)
-                        .addComponent(colorDataPointsBox, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addGroup(displayPanelLayout.createSequentialGroup()
-                        .addComponent(colorEntryPointsButton)
-                        .addGap(18, 18, 18)
-                        .addComponent(colorEntryPointsBox, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                .addContainerGap(108, Short.MAX_VALUE))
+                .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanel5Layout.createSequentialGroup()
+                        .addComponent(jPanel14, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(filler1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addComponent(foldablePanel3, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(foldablePanel5, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
         );
-        displayPanelLayout.setVerticalGroup(
-            displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(displayPanelLayout.createSequentialGroup()
+        jPanel5Layout.setVerticalGroup(
+            jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel5Layout.createSequentialGroup()
+                .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanel5Layout.createSequentialGroup()
+                        .addGap(36, 36, 36)
+                        .addComponent(filler1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addGroup(jPanel5Layout.createSequentialGroup()
+                        .addContainerGap()
+                        .addComponent(jPanel14, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addComponent(foldablePanel5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(foldablePanel3, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(1543, Short.MAX_VALUE))
+        );
+
+        jScrollPane1.setViewportView(jPanel5);
+
+        jTabbedPane1.addTab("", new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/2017-04-17_02h31_01.png")), jScrollPane1, "Analysis"); // NOI18N
+
+        jScrollPane5.getVerticalScrollBar().setUnitIncrement(16);
+        jScrollPane5.setVerticalScrollBarPolicy(javax.swing.ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
+        jScrollPane5.setPreferredSize(new java.awt.Dimension(600, 2058));
+
+        jPanel12.setPreferredSize(new java.awt.Dimension(500, 2056));
+
+        foldablePanel4.setTitle("Display Filters");
+
+        jPanel9.setLayout(new java.awt.GridLayout(6, 3));
+
+        jTextField9.setText("Clusters");
+        jPanel9.add(jTextField9);
+
+        jComboBox3.setBorder(Utils.getTableBorder());
+        jComboBox3.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "None", "Single Color", "Rainbow", "With Points", "Connected" }));
+        jComboBox3.addActionListener(new java.awt.event.ActionListener()
+        {
+            public void actionPerformed(java.awt.event.ActionEvent evt)
+            {
+                jComboBox3ActionPerformed(evt);
+            }
+        });
+        jPanel9.add(jComboBox3);
+
+        jColorButton5.setRoutePainter(routePainter);
+        jColorButton5.setFillColor(new java.awt.Color(255, 0, 0));
+        jColorButton5.setObjectName(com.nuwc.interestengine.gui.MapObject.Clusters);
+        jPanel9.add(jColorButton5);
+
+        jTextField22.setText("Routes");
+        jPanel9.add(jTextField22);
+
+        jComboBox4.setBorder(Utils.getTableBorder());
+        jComboBox4.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "None", "Rainbow", "Single Color" }));
+        jComboBox4.addActionListener(new java.awt.event.ActionListener()
+        {
+            public void actionPerformed(java.awt.event.ActionEvent evt)
+            {
+                jComboBox4ActionPerformed(evt);
+            }
+        });
+        jPanel9.add(jComboBox4);
+
+        jColorButton2.setRoutePainter(routePainter);
+        jColorButton2.setFillColor(new java.awt.Color(0, 0, 255));
+        jColorButton2.setObjectName(com.nuwc.interestengine.gui.MapObject.Routes);
+        jPanel9.add(jColorButton2);
+
+        jTextField23.setText("Data Points");
+        jPanel9.add(jTextField23);
+
+        jCheckBox4.setBorder(Utils.getTableBorder());
+        jCheckBox4.setBackground(new java.awt.Color(255, 255, 255));
+        jCheckBox4.setBorderPainted(true);
+        jCheckBox4.addActionListener(new java.awt.event.ActionListener()
+        {
+            public void actionPerformed(java.awt.event.ActionEvent evt)
+            {
+                jCheckBox4ActionPerformed(evt);
+            }
+        });
+        jPanel9.add(jCheckBox4);
+
+        jColorButton6.setRoutePainter(routePainter);
+        jColorButton6.setObjectName(com.nuwc.interestengine.gui.MapObject.DataPoints);
+        jPanel9.add(jColorButton6);
+
+        jTextField25.setText("Entry Points");
+        jPanel9.add(jTextField25);
+
+        jCheckBox5.setBorder(Utils.getTableBorder());
+        jCheckBox5.setBackground(new java.awt.Color(255, 255, 255));
+        jCheckBox5.setBorderPainted(true);
+        jCheckBox5.addActionListener(new java.awt.event.ActionListener()
+        {
+            public void actionPerformed(java.awt.event.ActionEvent evt)
+            {
+                jCheckBox5ActionPerformed(evt);
+            }
+        });
+        jPanel9.add(jCheckBox5);
+
+        jColorButton7.setRoutePainter(routePainter);
+        jColorButton7.setFillColor(new java.awt.Color(0, 255, 255));
+        jColorButton7.setObjectName(com.nuwc.interestengine.gui.MapObject.EntryPoints);
+        jPanel9.add(jColorButton7);
+
+        jTextField27.setText("Exit Points");
+        jPanel9.add(jTextField27);
+
+        jCheckBox6.setBorder(Utils.getTableBorder());
+        jCheckBox6.setBackground(new java.awt.Color(255, 255, 255));
+        jCheckBox6.setBorderPainted(true);
+        jCheckBox6.addActionListener(new java.awt.event.ActionListener()
+        {
+            public void actionPerformed(java.awt.event.ActionEvent evt)
+            {
+                jCheckBox6ActionPerformed(evt);
+            }
+        });
+        jPanel9.add(jCheckBox6);
+
+        jColorButton1.setRoutePainter(routePainter);
+        jColorButton1.setFillColor(new java.awt.Color(255, 0, 255));
+        jColorButton1.setObjectName(com.nuwc.interestengine.gui.MapObject.ExitPoints);
+        jPanel9.add(jColorButton1);
+
+        jTextField29.setText("Stop Points");
+        jPanel9.add(jTextField29);
+
+        jCheckBox7.setBorder(Utils.getTableBorder());
+        jCheckBox7.setBackground(new java.awt.Color(255, 255, 255));
+        jCheckBox7.setBorderPainted(true);
+        jCheckBox7.addActionListener(new java.awt.event.ActionListener()
+        {
+            public void actionPerformed(java.awt.event.ActionEvent evt)
+            {
+                jCheckBox7ActionPerformed(evt);
+            }
+        });
+        jPanel9.add(jCheckBox7);
+
+        jColorButton3.setRoutePainter(routePainter);
+        jColorButton3.setFillColor(new java.awt.Color(0, 255, 0));
+        jColorButton3.setObjectName(com.nuwc.interestengine.gui.MapObject.StopPoints);
+        jPanel9.add(jColorButton3);
+
+        javax.swing.GroupLayout jPanel8Layout = new javax.swing.GroupLayout(jPanel8);
+        jPanel8.setLayout(jPanel8Layout);
+        jPanel8Layout.setHorizontalGroup(
+            jPanel8Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel8Layout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(colorClustersButton)
-                    .addGroup(displayPanelLayout.createSequentialGroup()
-                        .addGroup(displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addGroup(displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                                .addComponent(drawClustersBox, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                .addComponent(colorClustersBox, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                            .addComponent(clustersModeCombo, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addGap(8, 8, 8)
-                        .addGroup(displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(colorRoutesBox, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                            .addGroup(displayPanelLayout.createSequentialGroup()
-                                .addGroup(displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                    .addGroup(displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                                        .addComponent(drawRoutesBox)
-                                        .addComponent(colorRoutesButton))
-                                    .addComponent(routesModeCombo, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                                .addGap(0, 4, Short.MAX_VALUE)))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addGroup(displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(colorDataPointsBox, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                            .addGroup(displayPanelLayout.createSequentialGroup()
-                                .addGroup(displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                                    .addComponent(drawDataPointsBox)
-                                    .addComponent(colorDataPointsButton))
-                                .addGap(0, 4, Short.MAX_VALUE)))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addGroup(displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(colorEntryPointsBox, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                            .addGroup(displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                                .addComponent(drawEntryPointsBox)
-                                .addComponent(colorEntryPointsButton)))))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addGroup(displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                        .addComponent(drawExitPointsBox)
-                        .addComponent(colorExitPointsButton))
-                    .addComponent(colorExitPointsBox, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addGroup(displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                        .addComponent(drawStopPointsBox)
-                        .addComponent(colorStopPointsButton))
-                    .addComponent(colorStopPointsBox, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addGap(31, 31, 31))
+                .addComponent(jPanel9, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addContainerGap())
+        );
+        jPanel8Layout.setVerticalGroup(
+            jPanel8Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel8Layout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(jPanel9, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
-        jPanel1.setBorder(javax.swing.BorderFactory.createTitledBorder("Neural Network"));
+        foldablePanel4.add(jPanel8, java.awt.BorderLayout.CENTER);
 
-        trainNetworkButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/convert_icon.png"))); // NOI18N
-        trainNetworkButton.setText("Train Network");
-        trainNetworkButton.addActionListener(new java.awt.event.ActionListener()
-        {
-            public void actionPerformed(java.awt.event.ActionEvent evt)
-            {
-                trainNetworkButtonActionPerformed(evt);
-            }
-        });
+        foldablePanel2.setTitle("Ship Type");
 
-        trainNetworkButton1.setText("Test");
-        trainNetworkButton1.addActionListener(new java.awt.event.ActionListener()
-        {
-            public void actionPerformed(java.awt.event.ActionEvent evt)
-            {
-                trainNetworkButton1ActionPerformed(evt);
-            }
-        });
+        jCheckBoxTree1.setBackground(new java.awt.Color(240, 240, 240));
+        javax.swing.tree.DefaultMutableTreeNode treeNode1 = new javax.swing.tree.DefaultMutableTreeNode("root");
+        javax.swing.tree.DefaultMutableTreeNode treeNode2 = new javax.swing.tree.DefaultMutableTreeNode("Cargo Vessel");
+        javax.swing.tree.DefaultMutableTreeNode treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Cargo Hazardous A");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Cargo Hazardous B");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Cargo Hazardous C");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Cargo Hazardous D");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Cargo Future 1");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Cargo Future 2");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Cargo Future 3");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Cargo Future 4");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Cargo No Additional Info");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Other");
+        treeNode2.add(treeNode3);
+        treeNode1.add(treeNode2);
+        treeNode2 = new javax.swing.tree.DefaultMutableTreeNode("Tanker");
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Tanker Hazardous A");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Tanker Hazardous B");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Tanker Hazardous C");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Tanker Hazardous D");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Tanker Future 1");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Tanker Future 2");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Tanker Future 3");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Tanker Future 4");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Tanker No Additional Info");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Other");
+        treeNode2.add(treeNode3);
+        treeNode1.add(treeNode2);
+        treeNode2 = new javax.swing.tree.DefaultMutableTreeNode("Passenger Vessel");
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Passenger Hazardous A");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Passenger Hazardous B");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Passenger Hazardous C");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Passenger Hazardous D");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Passenger Future 1");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Passenger Future 2");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Passenger Future 3");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Passenger Future 4");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Passenger No Additional Info");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Other");
+        treeNode2.add(treeNode3);
+        treeNode1.add(treeNode2);
+        treeNode2 = new javax.swing.tree.DefaultMutableTreeNode("High Speed Craft");
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("High Speed Craft Hazardous A");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("High Speed Craft Hazardous B");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("High Speed Craft Hazardous C");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("High Speed Craft Hazardous D");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Other");
+        treeNode2.add(treeNode3);
+        treeNode1.add(treeNode2);
+        treeNode2 = new javax.swing.tree.DefaultMutableTreeNode("Tugs & Special Craft");
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Wing In Ground");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Wing In Ground Hazardous A");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Wing In Ground Hazardous B");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Wing In Ground Hazardous C");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Wing In Ground Hazardous D");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Towing");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Large Towing");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Dredging Or Underwater Ops");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Diving Ops");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Military Ops");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Pilot Vessel");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Search And Rescue Vessel");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Tug");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Port Tender");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Anti Pollution Equipment");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Law Enforcement");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Spare Local Vessel 1");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Spare Local Vessel 2");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Medical Transport");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Ship According To RR Resolution No 18");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Other");
+        treeNode2.add(treeNode3);
+        treeNode1.add(treeNode2);
+        treeNode2 = new javax.swing.tree.DefaultMutableTreeNode("Fishing");
+        treeNode1.add(treeNode2);
+        treeNode2 = new javax.swing.tree.DefaultMutableTreeNode("Pleasure Craft");
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Sailing");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Other");
+        treeNode2.add(treeNode3);
+        treeNode1.add(treeNode2);
+        treeNode2 = new javax.swing.tree.DefaultMutableTreeNode("Miscellaneous");
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Other Hazardous A");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Other Hazardous B");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Other Hazardous C");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Other Hazardous D");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Other Future 1");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Other Future 2");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Other Future 3");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Other Future 4");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Other No Additional Info");
+        treeNode2.add(treeNode3);
+        treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Other");
+        treeNode2.add(treeNode3);
+        treeNode1.add(treeNode2);
+        treeNode2 = new javax.swing.tree.DefaultMutableTreeNode("Unknown");
+        treeNode1.add(treeNode2);
+        jCheckBoxTree1.setModel(new javax.swing.tree.DefaultTreeModel(treeNode1));
+        jCheckBoxTree1.setRootVisible(false);
+        jCheckBoxTree1.setScrollsOnExpand(false);
+        jScrollPane6.setViewportView(jCheckBoxTree1);
+
+        foldablePanel2.add(jScrollPane6, java.awt.BorderLayout.CENTER);
+
+        jPanel15.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0)));
+        jPanel15.setLayout(new java.awt.BorderLayout());
+
+        jLabel3.setBackground(new java.awt.Color(255, 255, 255));
+        jLabel3.setFont(new java.awt.Font("Times New Roman", 1, 18)); // NOI18N
+        jLabel3.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        jLabel3.setText("Display");
+        jPanel15.add(jLabel3, java.awt.BorderLayout.CENTER);
+
+        javax.swing.GroupLayout jPanel12Layout = new javax.swing.GroupLayout(jPanel12);
+        jPanel12.setLayout(jPanel12Layout);
+        jPanel12Layout.setHorizontalGroup(
+            jPanel12Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel12Layout.createSequentialGroup()
+                .addContainerGap()
+                .addGroup(jPanel12Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(foldablePanel2, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(foldablePanel4, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(jPanel15, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addContainerGap())
+        );
+        jPanel12Layout.setVerticalGroup(
+            jPanel12Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel12Layout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(jPanel15, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addComponent(foldablePanel4, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(foldablePanel2, javax.swing.GroupLayout.PREFERRED_SIZE, 300, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(1522, Short.MAX_VALUE))
+        );
+
+        jScrollPane5.setViewportView(jPanel12);
+
+        jTabbedPane1.addTab("", new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/2017-04-17_02h31_39.png")), jScrollPane5, "Filters"); // NOI18N
+
+        jScrollPane3.getVerticalScrollBar().setUnitIncrement(16);
+        jScrollPane3.setVerticalScrollBarPolicy(javax.swing.ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
+        jScrollPane3.setPreferredSize(new java.awt.Dimension(600, 2058));
+
+        jPanel6.setPreferredSize(new java.awt.Dimension(500, 2056));
+
+        aisSimulationAccordion.setTitle("AIS Simulation");
+        aisSimulationAccordion.setTitle("Vessel Data");
 
         runSimulationButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/route-play.png"))); // NOI18N
         runSimulationButton.setText("Run Simulation");
@@ -1043,74 +1371,140 @@ public class OptionsPanel extends javax.swing.JPanel
             }
         });
 
-        javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
-        jPanel1.setLayout(jPanel1Layout);
-        jPanel1Layout.setHorizontalGroup(
-            jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel1Layout.createSequentialGroup()
-                .addContainerGap()
-                .addComponent(trainNetworkButton)
-                .addGap(18, 18, 18)
-                .addComponent(trainNetworkButton1)
-                .addGap(18, 18, 18)
-                .addComponent(runSimulationButton)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+        numActiveVesselsLabel.setText("Number of Active Vessels:");
+
+        numActiveVesselsField.setEditable(false);
+
+        shipTypesChart.setBorder(javax.swing.BorderFactory.createEtchedBorder());
+
+        javax.swing.GroupLayout shipTypesChartLayout = new javax.swing.GroupLayout(shipTypesChart);
+        shipTypesChart.setLayout(shipTypesChartLayout);
+        shipTypesChartLayout.setHorizontalGroup(
+            shipTypesChartLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGap(0, 0, Short.MAX_VALUE)
         );
-        jPanel1Layout.setVerticalGroup(
-            jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel1Layout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(trainNetworkButton, javax.swing.GroupLayout.PREFERRED_SIZE, 41, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(trainNetworkButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 41, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(runSimulationButton, javax.swing.GroupLayout.PREFERRED_SIZE, 41, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+        shipTypesChartLayout.setVerticalGroup(
+            shipTypesChartLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGap(0, 221, Short.MAX_VALUE)
         );
 
-        javax.swing.GroupLayout mainScrollerPanelLayout = new javax.swing.GroupLayout(mainScrollerPanel);
-        mainScrollerPanel.setLayout(mainScrollerPanelLayout);
-        mainScrollerPanelLayout.setHorizontalGroup(
-            mainScrollerPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(mainScrollerPanelLayout.createSequentialGroup()
+        javax.swing.GroupLayout jPanel2Layout = new javax.swing.GroupLayout(jPanel2);
+        jPanel2.setLayout(jPanel2Layout);
+        jPanel2Layout.setHorizontalGroup(
+            jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel2Layout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(mainScrollerPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addGroup(mainScrollerPanelLayout.createSequentialGroup()
-                        .addComponent(displayPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addContainerGap())
-                    .addComponent(simulationPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(databasePanel, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(analysisPanel, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
-        );
-        mainScrollerPanelLayout.setVerticalGroup(
-            mainScrollerPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(mainScrollerPanelLayout.createSequentialGroup()
-                .addContainerGap()
-                .addComponent(simulationPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(18, 18, 18)
-                .addComponent(databasePanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(18, 18, 18)
-                .addComponent(analysisPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(18, 18, 18)
-                .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addGap(18, 18, 18)
-                .addComponent(displayPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(shipTypesChart, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addGroup(jPanel2Layout.createSequentialGroup()
+                        .addComponent(runSimulationButton)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addComponent(numActiveVesselsLabel)
+                        .addGap(18, 18, 18)
+                        .addComponent(numActiveVesselsField, javax.swing.GroupLayout.PREFERRED_SIZE, 100, javax.swing.GroupLayout.PREFERRED_SIZE)))
                 .addContainerGap())
         );
+        jPanel2Layout.setVerticalGroup(
+            jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel2Layout.createSequentialGroup()
+                .addContainerGap()
+                .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(runSimulationButton, javax.swing.GroupLayout.PREFERRED_SIZE, 41, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(numActiveVesselsLabel)
+                    .addComponent(numActiveVesselsField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addGap(18, 18, 18)
+                .addComponent(shipTypesChart, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+        );
 
-        mainScroller.setViewportView(mainScrollerPanel);
+        aisSimulationAccordion.add(jPanel2, java.awt.BorderLayout.CENTER);
+
+        jPanel16.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0)));
+        jPanel16.setLayout(new java.awt.BorderLayout());
+
+        jLabel4.setBackground(new java.awt.Color(255, 255, 255));
+        jLabel4.setFont(new java.awt.Font("Times New Roman", 1, 18)); // NOI18N
+        jLabel4.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        jLabel4.setText("Simulation");
+        jPanel16.add(jLabel4, java.awt.BorderLayout.CENTER);
+
+        javax.swing.GroupLayout jPanel6Layout = new javax.swing.GroupLayout(jPanel6);
+        jPanel6.setLayout(jPanel6Layout);
+        jPanel6Layout.setHorizontalGroup(
+            jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel6Layout.createSequentialGroup()
+                .addContainerGap()
+                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(jPanel16, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(aisSimulationAccordion, javax.swing.GroupLayout.DEFAULT_SIZE, 676, Short.MAX_VALUE))
+                .addContainerGap())
+        );
+        jPanel6Layout.setVerticalGroup(
+            jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel6Layout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(jPanel16, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addComponent(aisSimulationAccordion, javax.swing.GroupLayout.PREFERRED_SIZE, 326, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(1670, Short.MAX_VALUE))
+        );
+
+        jScrollPane3.setViewportView(jPanel6);
+
+        jTabbedPane1.addTab("", new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/2017-04-17_02h31_44.png")), jScrollPane3, "Simulation"); // NOI18N
+
+        jScrollPane4.getVerticalScrollBar().setUnitIncrement(16);
+        jScrollPane4.setHorizontalScrollBarPolicy(javax.swing.ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
+        jScrollPane4.setPreferredSize(new java.awt.Dimension(600, 2075));
+
+        jPanel11.setPreferredSize(new java.awt.Dimension(500, 2056));
+
+        jPanel17.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0)));
+        jPanel17.setLayout(new java.awt.BorderLayout());
+
+        jLabel5.setBackground(new java.awt.Color(255, 255, 255));
+        jLabel5.setFont(new java.awt.Font("Times New Roman", 1, 18)); // NOI18N
+        jLabel5.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        jLabel5.setText("Fleets");
+        jPanel17.add(jLabel5, java.awt.BorderLayout.CENTER);
+
+        javax.swing.GroupLayout jPanel11Layout = new javax.swing.GroupLayout(jPanel11);
+        jPanel11.setLayout(jPanel11Layout);
+        jPanel11Layout.setHorizontalGroup(
+            jPanel11Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel11Layout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(jPanel17, javax.swing.GroupLayout.DEFAULT_SIZE, 676, Short.MAX_VALUE)
+                .addContainerGap())
+        );
+        jPanel11Layout.setVerticalGroup(
+            jPanel11Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel11Layout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(jPanel17, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(2007, Short.MAX_VALUE))
+        );
+
+        jScrollPane4.setViewportView(jPanel11);
+
+        jTabbedPane1.addTab("", new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/2017-04-17_02h41_27.png")), jScrollPane4, "Fleets"); // NOI18N
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(this);
         this.setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(mainScroller, javax.swing.GroupLayout.DEFAULT_SIZE, 452, Short.MAX_VALUE)
+            .addComponent(jTabbedPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 500, Short.MAX_VALUE)
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(mainScroller, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+            .addComponent(jTabbedPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 800, Short.MAX_VALUE)
         );
     }// </editor-fold>//GEN-END:initComponents
+
+    private void entryEpsilonFieldActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_entryEpsilonFieldActionPerformed
+    {//GEN-HEADEREND:event_entryEpsilonFieldActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_entryEpsilonFieldActionPerformed
 
     private void extractRoutesButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_extractRoutesButtonActionPerformed
     {//GEN-HEADEREND:event_extractRoutesButtonActionPerformed
@@ -1124,69 +1518,160 @@ public class OptionsPanel extends javax.swing.JPanel
             int entryMinPoints = Integer.parseInt(entryMinPointsField.getText());
             int exitMinPoints = Integer.parseInt(exitMinPointsField.getText());
             int stopMinPoints = Integer.parseInt(stopMinPointsField.getText());
-            RouteExtractor extractor = new RouteExtractor(db, painter, mainFrame,
-                    lostTime, minSpeed, entryEpsilon, entryMinPoints,
+            RouteExtractor extractor = new RouteExtractor(db, routePainter,
+                    mainFrame, lostTime, minSpeed, entryEpsilon, entryMinPoints,
                     exitEpsilon, exitMinPoints, stopEpsilon, stopMinPoints);
             routes = extractor.run();
-            int n = 0;
+
+            System.out.println("Actual Routes: " + routes.size());
+            int i = 1;
+            int numPoints = 0;
             for (RouteObject route : routes)
             {
-                n += route.points.size();
+                numPoints += route.points.size();
+                System.out.println("Route " + i + ": " + route.points.size());
+                i++;
             }
-            System.out.println("# points = " + n);
-            numberClustersField.setText("" + extractor.getNumberOfClusters());
-            numberRoutesField.setText("" + extractor.getNumberOfRoutes());
+            System.out.println("Total points: " + numPoints);
+
+            selectionPanel.train();
+            selectionPanel.evaluateAccuracy();
+
+//            oversampledRoutes = extractor.getOversampledRoutes();
+//            System.out.println("Oversampled Routes: " + oversampledRoutes.size());
+//            numPoints = 0;
+//            for (RouteObject route : oversampledRoutes)
+//            {
+//                numPoints += route.points.size();
+//                System.out.println("Route ID " + route.id + ": " + route.points.size());
+//            }
+//            System.out.println("Total points: " + numPoints);
+//
+//            int inputs = 3;
+//            int hidden = 50;
+//            int outputs = oversampledRoutes.size();
+//            network = new NeuralNet(inputs, hidden, outputs, oversampledRoutes);
+//            network.load();
+//            if (network.getTrainedNet() != null)
+//            {
+//                network.evaluateModel(routes);
+//            }
         }
         else
         {
-            JOptionPane.showMessageDialog(this, "Database not populated!", "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Database not populated!",
+                    "Error", JOptionPane.ERROR_MESSAGE);
         }
     }//GEN-LAST:event_extractRoutesButtonActionPerformed
 
-    private void playPauseButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_playPauseButtonActionPerformed
-    {//GEN-HEADEREND:event_playPauseButtonActionPerformed
-        playPauseButton.setEnabled(false);
-        SimulationState state = simulation.getState();
-        if (state == SimulationState.STOPPED)
+    private void runSimulationButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_runSimulationButtonActionPerformed
+    {//GEN-HEADEREND:event_runSimulationButtonActionPerformed
+        JFileChooser fileChooser = new JFileChooser("C:\\Users\\User\\Desktop");
+        fileChooser.setFileFilter(new FileNameExtensionFilter("LOG file", "log"));
+        fileChooser.setMultiSelectionEnabled(true);
+        int returnValue = fileChooser.showOpenDialog(this);
+
+        if (returnValue == JFileChooser.APPROVE_OPTION)
         {
-            playPauseButton.setIcon(getPauseIcon());
-            playPauseButton.setText("Pause");
-            simulation.start();
+            File[] files = fileChooser.getSelectedFiles();
+            Arrays.sort(files, (File file1, File file2)
+                    ->
+            {
+                String path1 = file1.getAbsolutePath();
+                String path2 = file2.getAbsolutePath();
+                return path1.compareTo(path2);
+            });
+            float minLat = ((Double) minLatSpinner.getValue()).floatValue();
+            float maxLat = ((Double) maxLatSpinner.getValue()).floatValue();
+            float minLon = ((Double) minLonSpinner.getValue()).floatValue();
+            float maxLon = ((Double) maxLonSpinner.getValue()).floatValue();
+
+            ConcurrentLinkedQueue messageQueue = new ConcurrentLinkedQueue();
+            manager = new VesselManager(minLat, maxLat, minLon, maxLon, routePainter);
+            producer = new MessageProducer(files, messageQueue);
+            consumer = new MessageConsumer(messageQueue, manager);
+            Thread producerThread = new Thread(producer);
+            Thread consumerThread = new Thread(consumer);
+            producerThread.start();
+            consumerThread.start();
         }
-        else if (state == SimulationState.PAUSED)
+    }//GEN-LAST:event_runSimulationButtonActionPerformed
+
+    private void trainNetworkButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_trainNetworkButtonActionPerformed
+    {//GEN-HEADEREND:event_trainNetworkButtonActionPerformed
+        if (routes != null)
         {
-            playPauseButton.setIcon(getPauseIcon());
-            playPauseButton.setText("Pause");
-            simulation.unpause();
+            if (true)
+            {
+                int returnValue = JOptionPane.showConfirmDialog(this,
+                        "Overwrite Neural Network?", "Confirm",
+                        JOptionPane.WARNING_MESSAGE);
+                if (returnValue == JOptionPane.CANCEL_OPTION
+                        || returnValue == JOptionPane.CLOSED_OPTION)
+                {
+                    return;
+                }
+            }
+
+            int epochs = Integer.parseInt(epochsField.getText());
+            int batchSize = Integer.parseInt(batchSizeField.getText());
+            double learningRate = Double.parseDouble(learningRateField.getText());
+            double momentum = Double.parseDouble(momentumField.getText());
+            int iterations = Integer.parseInt(iterationsField.getText());
+            boolean useRegularization = regularizationCheckBox.isSelected();
+            Activation activation;
+            switch ((String) activationFunctionCombo.getSelectedItem())
+            {
+                case "Sigmoid":
+                    activation = Activation.SIGMOID;
+                    break;
+                case "Tanh":
+                    activation = Activation.TANH;
+                    break;
+                default:
+                    activation = Activation.RELU;
+            }
+            WeightInit weightInit;
+            switch ((String) weightInitCombo.getSelectedItem())
+            {
+                case "Relu":
+                    weightInit = WeightInit.RELU;
+                    break;
+                case "Uniform":
+                    weightInit = WeightInit.UNIFORM;
+                    break;
+                default:
+                    weightInit = WeightInit.XAVIER;
+            }
+            int inputs = 3;
+            int hidden = 50;
+            int outputs = oversampledRoutes.size();
+
+            for (RouteObject route : oversampledRoutes)
+            {
+                System.out.println(route.points.size());
+            }
+            network = new NeuralNet(inputs, hidden, outputs, epochs, batchSize,
+                    learningRate, momentum, iterations, useRegularization,
+                    activation, weightInit, oversampledRoutes);
+            network.train();
+            network.evaluateModel(routes);
+            System.out.println("***** COMPLETE *****");
         }
         else
         {
-            playPauseButton.setIcon(getPlayIcon());
-            playPauseButton.setText("Play");
-            simulation.pause();
+            JOptionPane.showMessageDialog(this, "Extract routes first!",
+                    "Error", JOptionPane.ERROR_MESSAGE);
         }
-        stopButton.setEnabled(true);
-        playPauseButton.setEnabled(true);
-    }//GEN-LAST:event_playPauseButtonActionPerformed
-
-    private void stopButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_stopButtonActionPerformed
-    {//GEN-HEADEREND:event_stopButtonActionPerformed
-        stopButton.setEnabled(false);
-        SimulationState state = simulation.getState();
-        if (state != SimulationState.STOPPED)
-        {
-            playPauseButton.setIcon(getPlayIcon());
-            playPauseButton.setText("Play");
-            simulation.stop();
-        }
-    }//GEN-LAST:event_stopButtonActionPerformed
+    }//GEN-LAST:event_trainNetworkButtonActionPerformed
 
     private void loadDataButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_loadDataButtonActionPerformed
     {//GEN-HEADEREND:event_loadDataButtonActionPerformed
         loadDataButton.setEnabled(false);
         extractRoutesButton.setEnabled(false);
 
-        JFileChooser fileChooser = new JFileChooser();
+        JFileChooser fileChooser = new JFileChooser("C:\\Users\\User\\Desktop");
+        fileChooser.setFileFilter(new FileNameExtensionFilter("LOG file", "log"));
         fileChooser.setMultiSelectionEnabled(true);
         int returnValue = fileChooser.showOpenDialog(this);
 
@@ -1194,7 +1679,9 @@ public class OptionsPanel extends javax.swing.JPanel
         {
             if (db.exists())
             {
-                returnValue = JOptionPane.showConfirmDialog(this, "Overwrite database?", "Confirm", JOptionPane.WARNING_MESSAGE);
+                returnValue = JOptionPane.showConfirmDialog(this,
+                        "Overwrite database?", "Confirm",
+                        JOptionPane.WARNING_MESSAGE);
                 if (returnValue == JOptionPane.CANCEL_OPTION
                         || returnValue == JOptionPane.CLOSED_OPTION)
                 {
@@ -1205,7 +1692,8 @@ public class OptionsPanel extends javax.swing.JPanel
             }
 
             File[] files = fileChooser.getSelectedFiles();
-            Arrays.sort(files, (File file1, File file2) ->
+            Arrays.sort(files, (File file1, File file2)
+                    ->
             {
                 String path1 = file1.getAbsolutePath();
                 String path2 = file2.getAbsolutePath();
@@ -1226,204 +1714,196 @@ public class OptionsPanel extends javax.swing.JPanel
         extractRoutesButton.setEnabled(true);
     }//GEN-LAST:event_loadDataButtonActionPerformed
 
-    private void entryEpsilonFieldActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_entryEpsilonFieldActionPerformed
-    {//GEN-HEADEREND:event_entryEpsilonFieldActionPerformed
+    private void batchSizeFieldActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_batchSizeFieldActionPerformed
+    {//GEN-HEADEREND:event_batchSizeFieldActionPerformed
         // TODO add your handling code here:
-    }//GEN-LAST:event_entryEpsilonFieldActionPerformed
+    }//GEN-LAST:event_batchSizeFieldActionPerformed
 
-    private void colorClustersButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_colorClustersButtonActionPerformed
-    {//GEN-HEADEREND:event_colorClustersButtonActionPerformed
-        colorDialog(colorClusters, defaultColorClusters, colorClustersBox, "clusters");
-    }//GEN-LAST:event_colorClustersButtonActionPerformed
+    private void jCheckBox4ActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_jCheckBox4ActionPerformed
+    {//GEN-HEADEREND:event_jCheckBox4ActionPerformed
+        routePainter.setDrawDataPoints(jCheckBox4.isSelected());
+    }//GEN-LAST:event_jCheckBox4ActionPerformed
 
-    private void drawClustersBoxActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_drawClustersBoxActionPerformed
-    {//GEN-HEADEREND:event_drawClustersBoxActionPerformed
-        painter.setDrawClusters(drawClustersBox.isSelected());
-    }//GEN-LAST:event_drawClustersBoxActionPerformed
+    private void jCheckBox5ActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_jCheckBox5ActionPerformed
+    {//GEN-HEADEREND:event_jCheckBox5ActionPerformed
+        routePainter.setDrawEntryPoints(jCheckBox5.isSelected());
+    }//GEN-LAST:event_jCheckBox5ActionPerformed
 
-    private void drawRoutesBoxActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_drawRoutesBoxActionPerformed
-    {//GEN-HEADEREND:event_drawRoutesBoxActionPerformed
-        painter.setDrawRoutes(drawRoutesBox.isSelected());
-    }//GEN-LAST:event_drawRoutesBoxActionPerformed
+    private void jCheckBox6ActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_jCheckBox6ActionPerformed
+    {//GEN-HEADEREND:event_jCheckBox6ActionPerformed
+        routePainter.setDrawExitPoints(jCheckBox6.isSelected());
+    }//GEN-LAST:event_jCheckBox6ActionPerformed
 
-    private void drawDataPointsBoxActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_drawDataPointsBoxActionPerformed
-    {//GEN-HEADEREND:event_drawDataPointsBoxActionPerformed
-        painter.setDrawDataPoints(drawDataPointsBox.isSelected());
-    }//GEN-LAST:event_drawDataPointsBoxActionPerformed
+    private void jCheckBox7ActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_jCheckBox7ActionPerformed
+    {//GEN-HEADEREND:event_jCheckBox7ActionPerformed
+        routePainter.setDrawStopPoints(jCheckBox7.isSelected());
+    }//GEN-LAST:event_jCheckBox7ActionPerformed
 
-    private void drawEntryPointsBoxActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_drawEntryPointsBoxActionPerformed
-    {//GEN-HEADEREND:event_drawEntryPointsBoxActionPerformed
-        painter.setDrawEntryPoints(drawEntryPointsBox.isSelected());
-    }//GEN-LAST:event_drawEntryPointsBoxActionPerformed
+    private void jComboBox4ActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_jComboBox4ActionPerformed
+    {//GEN-HEADEREND:event_jComboBox4ActionPerformed
+        routePainter.setRoutesMode((String) jComboBox4.getSelectedItem());
+    }//GEN-LAST:event_jComboBox4ActionPerformed
 
-    private void drawExitPointsBoxActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_drawExitPointsBoxActionPerformed
-    {//GEN-HEADEREND:event_drawExitPointsBoxActionPerformed
-        painter.setDrawExitPoints(drawExitPointsBox.isSelected());
-    }//GEN-LAST:event_drawExitPointsBoxActionPerformed
+    private void jComboBox3ActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_jComboBox3ActionPerformed
+    {//GEN-HEADEREND:event_jComboBox3ActionPerformed
+        routePainter.setClustersMode((String) jComboBox3.getSelectedItem());
+    }//GEN-LAST:event_jComboBox3ActionPerformed
 
-    private void drawStopPointsBoxActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_drawStopPointsBoxActionPerformed
-    {//GEN-HEADEREND:event_drawStopPointsBoxActionPerformed
-        painter.setDrawStopPoints(drawStopPointsBox.isSelected());
-    }//GEN-LAST:event_drawStopPointsBoxActionPerformed
+    private void numVesselsFieldActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_numVesselsFieldActionPerformed
+    {//GEN-HEADEREND:event_numVesselsFieldActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_numVesselsFieldActionPerformed
 
-    private void colorRoutesButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_colorRoutesButtonActionPerformed
-    {//GEN-HEADEREND:event_colorRoutesButtonActionPerformed
-        colorDialog(colorRoutes, defaultColorRoutes, colorRoutesBox, "routes");
-    }//GEN-LAST:event_colorRoutesButtonActionPerformed
-
-    private void colorDataPointsButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_colorDataPointsButtonActionPerformed
-    {//GEN-HEADEREND:event_colorDataPointsButtonActionPerformed
-        colorDialog(colorDataPoints, defaultColorDataPoints, colorDataPointsBox, "dataPoints");
-    }//GEN-LAST:event_colorDataPointsButtonActionPerformed
-
-    private void colorEntryPointsButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_colorEntryPointsButtonActionPerformed
-    {//GEN-HEADEREND:event_colorEntryPointsButtonActionPerformed
-        colorDialog(colorEntryPoints, defaultColorEntryPoints, colorEntryPointsBox, "entryPoints");
-    }//GEN-LAST:event_colorEntryPointsButtonActionPerformed
-
-    private void colorExitPointsButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_colorExitPointsButtonActionPerformed
-    {//GEN-HEADEREND:event_colorExitPointsButtonActionPerformed
-        colorDialog(colorExitPoints, defaultColorExitPoints, colorExitPointsBox, "exitPoints");
-    }//GEN-LAST:event_colorExitPointsButtonActionPerformed
-
-    private void colorStopPointsButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_colorStopPointsButtonActionPerformed
-    {//GEN-HEADEREND:event_colorStopPointsButtonActionPerformed
-        colorDialog(colorStopPoints, defaultColorStopPoints, colorStopPointsBox, "stopPoints");
-    }//GEN-LAST:event_colorStopPointsButtonActionPerformed
-
-    private void clustersModeComboActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_clustersModeComboActionPerformed
-    {//GEN-HEADEREND:event_clustersModeComboActionPerformed
-        painter.setClustersMode((String) clustersModeCombo.getSelectedItem());
-    }//GEN-LAST:event_clustersModeComboActionPerformed
-
-    private void routesModeComboActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_routesModeComboActionPerformed
-    {//GEN-HEADEREND:event_routesModeComboActionPerformed
-        painter.setRoutesMode((String) routesModeCombo.getSelectedItem());
-    }//GEN-LAST:event_routesModeComboActionPerformed
-
-    private void trainNetworkButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_trainNetworkButtonActionPerformed
-    {//GEN-HEADEREND:event_trainNetworkButtonActionPerformed
-        if (routes != null)
+    private void minLatSpinnerStateChanged(javax.swing.event.ChangeEvent evt)//GEN-FIRST:event_minLatSpinnerStateChanged
+    {//GEN-HEADEREND:event_minLatSpinnerStateChanged
+        if (!modifyingMiniMap)
         {
-            for (RouteObject route : routes)
-            {
-                System.out.println(route.points.size());
-            }
-            network = new NeuralNet(5, 50, routes.size(), 5, 350, 0.01, routes);
-            network.train();
+            updateMiniMap();
         }
-        System.out.println("***** COMPLETE *****");
-    }//GEN-LAST:event_trainNetworkButtonActionPerformed
+    }//GEN-LAST:event_minLatSpinnerStateChanged
 
-    private void trainNetworkButton1ActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_trainNetworkButton1ActionPerformed
-    {//GEN-HEADEREND:event_trainNetworkButton1ActionPerformed
-        if (network != null)
+    private void maxLatSpinnerStateChanged(javax.swing.event.ChangeEvent evt)//GEN-FIRST:event_maxLatSpinnerStateChanged
+    {//GEN-HEADEREND:event_maxLatSpinnerStateChanged
+        if (!modifyingMiniMap)
         {
-            network.test();
+            updateMiniMap();
         }
-    }//GEN-LAST:event_trainNetworkButton1ActionPerformed
+    }//GEN-LAST:event_maxLatSpinnerStateChanged
 
-    private void runSimulationButtonActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_runSimulationButtonActionPerformed
-    {//GEN-HEADEREND:event_runSimulationButtonActionPerformed
-        JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setMultiSelectionEnabled(true);
-        int returnValue = fileChooser.showOpenDialog(this);
-
-        if (returnValue == JFileChooser.APPROVE_OPTION)
+    private void minLonSpinnerStateChanged(javax.swing.event.ChangeEvent evt)//GEN-FIRST:event_minLonSpinnerStateChanged
+    {//GEN-HEADEREND:event_minLonSpinnerStateChanged
+        if (!modifyingMiniMap)
         {
-            File[] files = fileChooser.getSelectedFiles();
-            Arrays.sort(files, (File file1, File file2) ->
-            {
-                String path1 = file1.getAbsolutePath();
-                String path2 = file2.getAbsolutePath();
-                return path1.compareTo(path2);
-            });
-            float minLat = ((Double) minLatSpinner.getValue()).floatValue();
-            float maxLat = ((Double) maxLatSpinner.getValue()).floatValue();
-            float minLon = ((Double) minLonSpinner.getValue()).floatValue();
-            float maxLon = ((Double) maxLonSpinner.getValue()).floatValue();
-
-            ConcurrentLinkedQueue messageQueue = new ConcurrentLinkedQueue();
-            VesselManager manager = new VesselManager(minLat, maxLat, minLon, maxLon, painter);
-            MessageProducer producer = new MessageProducer(files, messageQueue);
-            MessageConsumer consumer = new MessageConsumer(messageQueue, manager);
-            Thread producerThread = new Thread(producer);
-            Thread consumerThread = new Thread(consumer);
-            producerThread.start();
-            consumerThread.start();
+            updateMiniMap();
         }
-    }//GEN-LAST:event_runSimulationButtonActionPerformed
+    }//GEN-LAST:event_minLonSpinnerStateChanged
+
+    private void maxLonSpinnerStateChanged(javax.swing.event.ChangeEvent evt)//GEN-FIRST:event_maxLonSpinnerStateChanged
+    {//GEN-HEADEREND:event_maxLonSpinnerStateChanged
+        if (!modifyingMiniMap)
+        {
+            updateMiniMap();
+        }
+    }//GEN-LAST:event_maxLonSpinnerStateChanged
+
+    private void epochsFieldActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_epochsFieldActionPerformed
+    {//GEN-HEADEREND:event_epochsFieldActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_epochsFieldActionPerformed
+
+    private void jTextField14ActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_jTextField14ActionPerformed
+    {//GEN-HEADEREND:event_jTextField14ActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_jTextField14ActionPerformed
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JPanel AnalysisSettingsPanel;
-    private javax.swing.JPanel DatabaseSettingsPanel;
+    private javax.swing.JPanel AnalysisSettingsPanel2;
+    private com.nuwc.interestengine.gui.FoldablePanel aisSimulationAccordion;
     private javax.swing.JPanel analysisPanel;
-    private javax.swing.JComboBox<String> clustersModeCombo;
-    private javax.swing.JPanel colorClustersBox;
-    private javax.swing.JButton colorClustersButton;
-    private javax.swing.JPanel colorDataPointsBox;
-    private javax.swing.JButton colorDataPointsButton;
-    private javax.swing.JPanel colorEntryPointsBox;
-    private javax.swing.JButton colorEntryPointsButton;
-    private javax.swing.JPanel colorExitPointsBox;
-    private javax.swing.JButton colorExitPointsButton;
-    private javax.swing.JPanel colorRoutesBox;
-    private javax.swing.JButton colorRoutesButton;
-    private javax.swing.JPanel colorStopPointsBox;
-    private javax.swing.JButton colorStopPointsButton;
-    private javax.swing.JPanel databasePanel;
-    private javax.swing.JTabbedPane databaseTabs;
-    private javax.swing.JPanel displayPanel;
-    private javax.swing.JCheckBox drawClustersBox;
-    private javax.swing.JCheckBox drawDataPointsBox;
-    private javax.swing.JCheckBox drawEntryPointsBox;
-    private javax.swing.JCheckBox drawExitPointsBox;
-    private javax.swing.JCheckBox drawRoutesBox;
-    private javax.swing.JCheckBox drawStopPointsBox;
+    private javax.swing.JTextField batchSizeField;
+    private com.nuwc.interestengine.gui.FoldablePanel databaseAccordion;
     private javax.swing.JTextField entryEpsilonField;
-    private javax.swing.JLabel entryEpsilonLabel;
     private javax.swing.JTextField entryMinPointsField;
-    private javax.swing.JLabel entryMinPointsLabel;
+    private javax.swing.JTextField epochsField;
     private javax.swing.JTextField exitEpsilonField;
-    private javax.swing.JLabel exitEpsilonLabel;
     private javax.swing.JTextField exitMinPointsField;
-    private javax.swing.JLabel exitMinPointsLabel;
     private javax.swing.JButton extractRoutesButton;
+    private javax.swing.Box.Filler filler1;
+    private com.nuwc.interestengine.gui.FoldablePanel foldablePanel1;
+    private com.nuwc.interestengine.gui.FoldablePanel foldablePanel2;
+    private com.nuwc.interestengine.gui.FoldablePanel foldablePanel3;
+    private com.nuwc.interestengine.gui.FoldablePanel foldablePanel4;
+    private com.nuwc.interestengine.gui.FoldablePanel foldablePanel5;
+    private javax.swing.JCheckBox jCheckBox4;
+    private javax.swing.JCheckBox jCheckBox5;
+    private javax.swing.JCheckBox jCheckBox6;
+    private javax.swing.JCheckBox jCheckBox7;
+    private com.nuwc.interestengine.gui.JCheckBoxTree jCheckBoxTree1;
+    private com.nuwc.interestengine.gui.JColorButton jColorButton1;
+    private com.nuwc.interestengine.gui.JColorButton jColorButton2;
+    private com.nuwc.interestengine.gui.JColorButton jColorButton3;
+    private com.nuwc.interestengine.gui.JColorButton jColorButton5;
+    private com.nuwc.interestengine.gui.JColorButton jColorButton6;
+    private com.nuwc.interestengine.gui.JColorButton jColorButton7;
+    private javax.swing.JComboBox<String> jComboBox3;
+    private javax.swing.JComboBox<String> jComboBox4;
+    private javax.swing.JLabel jLabel1;
+    private javax.swing.JLabel jLabel2;
+    private javax.swing.JLabel jLabel3;
+    private javax.swing.JLabel jLabel4;
+    private javax.swing.JLabel jLabel5;
     private javax.swing.JPanel jPanel1;
+    private javax.swing.JPanel jPanel10;
+    private javax.swing.JPanel jPanel11;
+    private javax.swing.JPanel jPanel12;
+    private javax.swing.JPanel jPanel13;
+    private javax.swing.JPanel jPanel14;
+    private javax.swing.JPanel jPanel15;
+    private javax.swing.JPanel jPanel16;
+    private javax.swing.JPanel jPanel17;
+    private javax.swing.JPanel jPanel2;
+    private javax.swing.JPanel jPanel3;
+    private javax.swing.JPanel jPanel4;
+    private javax.swing.JPanel jPanel5;
+    private javax.swing.JPanel jPanel6;
+    private javax.swing.JPanel jPanel7;
+    private javax.swing.JPanel jPanel8;
+    private javax.swing.JPanel jPanel9;
+    private javax.swing.JScrollPane jScrollPane1;
+    private javax.swing.JScrollPane jScrollPane2;
+    private javax.swing.JScrollPane jScrollPane3;
+    private javax.swing.JScrollPane jScrollPane4;
+    private javax.swing.JScrollPane jScrollPane5;
+    private javax.swing.JScrollPane jScrollPane6;
+    private javax.swing.JTabbedPane jTabbedPane1;
+    private javax.swing.JTextField jTextField1;
+    private javax.swing.JTextField jTextField10;
+    private javax.swing.JTextField jTextField11;
+    private javax.swing.JTextField jTextField12;
+    private javax.swing.JTextField jTextField13;
+    private javax.swing.JTextField jTextField14;
+    private javax.swing.JTextField jTextField17;
+    private javax.swing.JTextField jTextField18;
+    private javax.swing.JTextField jTextField19;
+    private javax.swing.JTextField jTextField2;
+    private javax.swing.JTextField jTextField20;
+    private javax.swing.JTextField jTextField22;
+    private javax.swing.JTextField jTextField23;
+    private javax.swing.JTextField jTextField25;
+    private javax.swing.JTextField jTextField27;
+    private javax.swing.JTextField jTextField29;
+    private javax.swing.JTextField jTextField3;
+    private javax.swing.JTextField jTextField4;
+    private javax.swing.JTextField jTextField5;
+    private javax.swing.JTextField jTextField6;
+    private javax.swing.JTextField jTextField7;
+    private javax.swing.JTextField jTextField8;
+    private javax.swing.JTextField jTextField9;
+    private javax.swing.JTextField learningRateField;
     private javax.swing.JButton loadDataButton;
     private javax.swing.JTextField lostTimeField;
-    private javax.swing.JLabel lostTimeLabel;
-    private javax.swing.JScrollPane mainScroller;
-    private javax.swing.JPanel mainScrollerPanel;
-    private javax.swing.JLabel maxLatLabel;
     private javax.swing.JSpinner maxLatSpinner;
-    private javax.swing.JLabel maxLonLabel;
     private javax.swing.JSpinner maxLonSpinner;
-    private javax.swing.JLabel minLatLabel;
     private javax.swing.JSpinner minLatSpinner;
-    private javax.swing.JLabel minLonLabel;
     private javax.swing.JSpinner minLonSpinner;
     private javax.swing.JTextField minSpeedField;
-    private javax.swing.JLabel minSpeedLabel;
-    private javax.swing.JTextField numberAISPointsField;
-    private javax.swing.JLabel numberAISPointsLabel;
-    private javax.swing.JTextField numberClustersField;
-    private javax.swing.JLabel numberClustersLabel;
-    private javax.swing.JTextField numberRoutesField;
-    private javax.swing.JLabel numberRoutesLabel;
-    private javax.swing.JTextField numberVesselsField;
-    private javax.swing.JLabel numberVesselsLabel;
-    private javax.swing.JButton playPauseButton;
-    private javax.swing.JComboBox<String> routesModeCombo;
+    private com.nuwc.interestengine.gui.MapPanel miniMapPanel;
+    private javax.swing.JTextField numAISPointsField;
+    private javax.swing.JLabel numAISPointsLabel;
+    private javax.swing.JTextField numActiveVesselsField;
+    private javax.swing.JLabel numActiveVesselsLabel;
+    private javax.swing.JTextField numClustersField;
+    private javax.swing.JLabel numClustersLabel;
+    private javax.swing.JTextField numRoutesField;
+    private javax.swing.JLabel numRoutesLabel;
+    private javax.swing.JTextField numVesselsField;
+    private javax.swing.JLabel numVesselsLabel;
     private javax.swing.JButton runSimulationButton;
-    private javax.swing.JPanel simulationPanel;
-    private javax.swing.JButton stopButton;
+    private com.nuwc.interestengine.gui.JChartPanel shipTypesChart;
     private javax.swing.JTextField stopEpsilonField;
-    private javax.swing.JLabel stopEpsilonLabel;
     private javax.swing.JTextField stopMinPointsField;
-    private javax.swing.JLabel stopMinPointsLabel;
     private javax.swing.JButton trainNetworkButton;
-    private javax.swing.JButton trainNetworkButton1;
     private javax.swing.JScrollPane vesselDataScroller;
     private javax.swing.JTable vesselDataTable;
     // End of variables declaration//GEN-END:variables

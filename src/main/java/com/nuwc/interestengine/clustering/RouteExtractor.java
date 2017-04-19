@@ -1,5 +1,6 @@
 package com.nuwc.interestengine.clustering;
 
+import com.nuwc.interestengine.Utils;
 import com.nuwc.interestengine.data.PointType;
 import com.nuwc.interestengine.data.DataPoint;
 import com.nuwc.interestengine.data.Database;
@@ -8,7 +9,14 @@ import com.nuwc.interestengine.data.AISPoint;
 import com.nuwc.interestengine.map.RoutePainter;
 import java.awt.Color;
 import java.awt.Point;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -33,8 +41,11 @@ public class RouteExtractor
     private final List<AISPoint> entryPoints;
     private final List<AISPoint> exitPoints;
     private final List<AISPoint> stopPoints;
-    private final HashMap<Point, RouteObject> routes;
     private final List<AISPoint> aisPoints;
+
+    private HashMap<Point, RouteObject> routes;
+    private int id = 0;
+    private String routesPath;
 
     private final List<Cluster> clusterList;
     private final int minPoints;
@@ -68,8 +79,10 @@ public class RouteExtractor
         entryPoints = new ArrayList<>();
         exitPoints = new ArrayList<>();
         stopPoints = new ArrayList<>();
-        routes = new HashMap<>();
         aisPoints = new ArrayList<>();
+
+        routes = new HashMap<>();
+        init();
 
         clusterList = new ArrayList<>();
         clustersCount = 0;
@@ -79,6 +92,124 @@ public class RouteExtractor
         entryIndex = 0;
         exitIndex = 0;
         stopIndex = 0;
+    }
+
+    private void init()
+    {
+        File routesDir = new File(Utils.getResource("") + "/routes");
+        if (!routesDir.exists())
+        {
+            routesDir.mkdir();
+        }
+
+        routesPath = routesDir.getAbsolutePath() + "/routes.ser";
+    }
+
+    public void saveRoutes()
+    {
+        ObjectOutputStream objectOutStream = null;
+        try
+        {
+            FileOutputStream outStream = new FileOutputStream(routesPath);
+            objectOutStream = new ObjectOutputStream(outStream);
+            objectOutStream.writeObject(routes);
+        }
+        catch (IOException e)
+        {
+            System.out.println("Failed to write routes to file.");
+        }
+        finally
+        {
+            try
+            {
+                objectOutStream.close();
+            }
+            catch (IOException e)
+            {
+                System.out.println("Failed to close routes output stream.");
+            }
+        }
+    }
+
+    public void loadRoutes()
+    {
+        ObjectInputStream objectInStream = null;
+        try
+        {
+            FileInputStream inStream = new FileInputStream(routesPath);
+            objectInStream = new ObjectInputStream(inStream);
+            routes = (HashMap<Point, RouteObject>) objectInStream.readObject();
+        }
+        catch (IOException | ClassNotFoundException ex)
+        {
+            System.out.println("Failed to read routes from file.");
+        }
+        finally
+        {
+            try
+            {
+                objectInStream.close();
+            }
+            catch (IOException ex)
+            {
+                System.out.println("Failed to close routes input stream.");
+            }
+        }
+    }
+
+    public List<RouteObject> getOversampledRoutes()
+    {
+        List<RouteObject> allRoutes = new ArrayList<>();
+        for (RouteObject route : routes.values())
+        {
+            allRoutes.add(route);
+        }
+
+        List<RouteObject> validRoutes = new ArrayList<>();
+        for (RouteObject route : allRoutes)
+        {
+            if (route.points.size() >= 100)
+            {
+                validRoutes.add(route);
+            }
+        }
+
+        int maxPoints = validRoutes.get(0).points.size();
+        for (RouteObject route : validRoutes)
+        {
+            int numPoints = route.points.size();
+            if (numPoints > maxPoints)
+            {
+                maxPoints = numPoints;
+            }
+        }
+
+        List<RouteObject> oversampledRoutes = new ArrayList<>();
+        for (RouteObject route : validRoutes)
+        {
+            List<AISPoint> oversampledPoints = new ArrayList<>(route.points);
+            int deficit = maxPoints - route.points.size();
+            System.out.println("deficit " + deficit);
+            Random rand = new Random();
+            for (int i = 0; i < deficit; i++)
+            {
+                int randIndex = rand.nextInt(route.points.size());
+                AISPoint randPoint = route.points.get(randIndex);
+                AISPoint newPoint = new AISPoint();
+                newPoint.lat = randPoint.lat;
+                newPoint.lon = randPoint.lon;
+                newPoint.sog = randPoint.sog;
+                newPoint.cog = randPoint.cog;
+                newPoint.shipType = randPoint.shipType;
+                oversampledPoints.add(newPoint);
+            }
+            Collections.shuffle(oversampledPoints);
+            RouteObject oversampledRoute = new RouteObject(route.id);
+            oversampledRoute.points = oversampledPoints;
+            oversampledRoutes.add(oversampledRoute);
+        }
+
+        return oversampledRoutes;
     }
 
     public int getNumberOfClusters()
@@ -151,7 +282,18 @@ public class RouteExtractor
             route.color = randColor;
         }
 
-        painter.setRoutes(new ArrayList<>(routes.values()));
+        int k = 0;
+        List<RouteObject> validRoutes = new ArrayList<>();
+        for (RouteObject route : routes.values())
+        {
+            if (route.points.size() >= 100)
+            {
+                route.id = k++;
+                validRoutes.add(route);
+            }
+        }
+
+        painter.setRoutes(validRoutes);
         painter.setClusters(clusterList);
         painter.setDataPoints(aisPoints);
         painter.setEntryPoints(entryPoints);
@@ -160,26 +302,7 @@ public class RouteExtractor
 
         System.out.println("Route Extraction 2 Complete.");
 
-        List<RouteObject> routesForTraining = new ArrayList<>();
-        for (RouteObject route : routes.values())
-        {
-            if (route.points.size() > 300)
-            {
-                RouteObject newRoute = new RouteObject();
-                int numOver = route.points.size() - 300;
-                List<AISPoint> newPoints = new ArrayList<>(route.points);
-                Collections.shuffle(newPoints);
-                newRoute.points
-                        = newPoints.subList(0, newPoints.size() - numOver + 1);
-                routesForTraining.add(newRoute);
-            }
-            else if (route.points.size() > 100)
-            {
-                routesForTraining.add(route);
-            }
-        }
-
-        return routesForTraining;
+        return validRoutes;
     }
 
     private void extractRoutes(int mmsi, AISPoint point, String shipType,
@@ -257,7 +380,7 @@ public class RouteExtractor
             routeKey.y = waypointY.getID();
             if (!routes.containsKey(routeKey))
             {
-                routes.put(routeKey, new RouteObject());
+                routes.put(routeKey, new RouteObject(id++));
             }
 
             long timestampX = v.wpTimestamps.get(x);
@@ -272,6 +395,7 @@ public class RouteExtractor
                     route.points.add(point);
                 }
             }
+            route.vessels.add(v);
 
             route.waypoints.add(waypointX);
             route.waypoints.add(waypointY);

@@ -1,6 +1,7 @@
 package com.nuwc.interestengine;
 
 import com.nuwc.interestengine.map.Marker;
+import dk.tbsalling.aismessages.ais.messages.types.NavigationStatus;
 import java.awt.Color;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -11,6 +12,8 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Properties;
+import javax.swing.JTextField;
+import javax.swing.border.Border;
 import org.jxmapviewer.viewer.GeoPosition;
 
 public final class Utils
@@ -19,6 +22,28 @@ public final class Utils
 
     private static final HashMap<String, String> shipCategory = new HashMap<>();
     private static final HashMap<String, Color> shipColor = new HashMap<>();
+    private static final String shipTypes[] =
+    {
+        "Cargo Vessel",
+        "Tanker",
+        "Passenger Vessel",
+        "High Speed Craft",
+        "Tugs & Special Craft",
+        "Fishing",
+        "Pleasure Craft",
+        "Miscellaneous",
+        "Unknown"
+    };
+
+    private Utils()
+    {
+        // Just a function library.
+    }
+
+    public static String[] getShipTypes()
+    {
+        return shipTypes;
+    }
 
     public static String getShipCategory(String type)
     {
@@ -138,9 +163,16 @@ public final class Utils
         }
     }
 
-    private Utils()
+    public static boolean isAnchored(NavigationStatus status)
     {
-        // Just a function library.
+        return (status == NavigationStatus.Aground
+                || status == NavigationStatus.AtAnchor
+                || status == NavigationStatus.Moored);
+    }
+
+    public static Border getTableBorder()
+    {
+        return new JTextField().getBorder();
     }
 
     public static void updateProps(Properties props)

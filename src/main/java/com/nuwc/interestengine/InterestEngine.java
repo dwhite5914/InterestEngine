@@ -2,6 +2,7 @@ package com.nuwc.interestengine;
 
 import com.nuwc.interestengine.gui.MainFrame;
 import javax.swing.UIManager;
+import javax.swing.UIManager.LookAndFeelInfo;
 import javax.swing.UnsupportedLookAndFeelException;
 
 public class InterestEngine
@@ -12,11 +13,26 @@ public class InterestEngine
         try
         {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+            for (LookAndFeelInfo info : UIManager.getInstalledLookAndFeels())
+            {
+                if ("Nimbus".equals(info.getName()))
+                {
+                    UIManager.setLookAndFeel(info.getClassName());
+                    break;
+                }
+            }
         }
-        catch (ClassNotFoundException | InstantiationException
-                | IllegalAccessException | UnsupportedLookAndFeelException e)
+        catch (Exception e)
         {
-            System.out.println("Look and feel not found.");
+            // If Nimbus is not available, fall back to cross-platform
+            try
+            {
+                UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName());
+            }
+            catch (Exception ex)
+            {
+                // not worth my time
+            }
         }
 
         System.setProperty("hadoop.home.dir", "C:\\winutils\\");

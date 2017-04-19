@@ -10,8 +10,6 @@ import java.util.List;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.mllib.linalg.Vector;
-import org.apache.spark.mllib.linalg.Vectors;
 import org.deeplearning4j.eval.Evaluation;
 import org.deeplearning4j.nn.api.OptimizationAlgorithm;
 import org.deeplearning4j.nn.conf.MultiLayerConfiguration;
@@ -29,6 +27,7 @@ import org.nd4j.linalg.activations.Activation;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.dataset.SplitTestAndTrain;
+import org.nd4j.linalg.dataset.api.iterator.SamplingDataSetIterator;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.lossfunctions.LossFunctions.LossFunction;
 import org.slf4j.Logger;
@@ -36,56 +35,83 @@ import org.slf4j.LoggerFactory;
 
 public class NeuralNet
 {
+    private final boolean saveUpdaters = true;
     private int seed = 123;
     private int numInputs;
     private int numHidden;
     private int numOutputs;
-    private int batchSize;
     private int numEpochs;
+    private int batchSize;
     private double learningRate;
+    private double momentum;
+    private int iterations;
+    private boolean useRegularization;
+    private Activation activation;
+    private WeightInit weightInit;
     private final List<RouteObject> routes;
     private double sogMean;
     private double sogStdev;
     private List<String> types;
+    private File nnFile;
     private SparkDl4jMultiLayer sparkNet;
+    private MultiLayerNetwork trainedNet;
 
     private static final Logger log
             = LoggerFactory.getLogger(NeuralNet.class);
 
     public NeuralNet(int numInputs, int numHidden, int numOutputs,
-            int batchSize, int numEpochs, double learningRate,
             List<RouteObject> routes)
     {
         this.numInputs = numInputs;
         this.numHidden = numHidden;
         this.numOutputs = numOutputs;
-        this.batchSize = batchSize;
-        this.numEpochs = numEpochs;
-        this.learningRate = learningRate;
         this.routes = routes;
         this.types = new ArrayList<>();
         sogStats();
+        init();
     }
 
-    public void test()
+    public NeuralNet(int numInputs, int numHidden, int numOutputs,
+            int numEpochs, int batchSize, double learningRate,
+            double momentum, int iterations, boolean useRegularization,
+            Activation activation, WeightInit weightInit,
+            List<RouteObject> routes)
     {
-        double lat = preprocess("lat", 45.0f);
-        double lon = preprocess("lon", 14.5f);
-        double sog = preprocess("sog", 3.0f);
-        double cog = preprocess("cog", 45.0f);
-        double type = preprocess("type", "NotAvailable");
-        Vector result = sparkNet.predict(Vectors.dense(new double[]
-        {
-            lat, lon, sog, cog, type
-        }));
-        double prediction[] = result.toArray();
-        System.out.println("***** SAMPLE: *****");
-        for (double d : prediction)
-        {
-            System.out.print(d + " ");
-        }
+        this.numInputs = numInputs;
+        this.numHidden = numHidden;
+        this.numOutputs = numOutputs;
+        this.numEpochs = numEpochs;
+        this.batchSize = batchSize;
+        this.learningRate = learningRate;
+        this.momentum = momentum;
+        this.iterations = iterations;
+        this.useRegularization = useRegularization;
+        this.activation = activation;
+        this.weightInit = weightInit;
+        this.routes = routes;
+        this.types = new ArrayList<>();
+        sogStats();
+        init();
     }
 
+//    public void test()
+//    {
+//        double lat = preprocess("lat", 45.0f);
+//        double lon = preprocess("lon", 14.5f);
+//        double sog = preprocess("sog", 3.0f);
+//        double cog = preprocess("cog", 45.0f);
+//        double type = preprocess("type", "NotAvailable");
+//        Vector result = sparkNet.predict(Vectors.dense(new double[]
+//        {
+//            lat, lon, sog, cog, type
+//        }));
+//        double prediction[] = result.toArray();
+//        System.out.println("***** SAMPLE: *****");
+//        for (double d : prediction)
+//        {
+//            System.out.print(d + " ");
+//        }
+//    }
     public void train()
     {
         DataSet allData = getDataSet();
@@ -119,13 +145,20 @@ public class NeuralNet
         for (int i = 0; i < numEpochs; i++)
         {
             sparkNet.fit(trainData);
+            log.info("-------------------------------------------------");
+            log.info("-------------------------------------------------");
             log.info("Complete Epoch {}", i);
+            log.info("" + i);
+            log.info("" + i);
+            log.info("" + i);
+            log.info("" + i);
+            log.info("-------------------------------------------------");
+            log.info("-------------------------------------------------");
         }
 
-        Evaluation eval = sparkNet.evaluate(testData);
-        log.info("***** Evaluation *****");
-        log.info(eval.stats());
-
+//        Evaluation eval = sparkNet.evaluate(testData);
+//        log.info("***** Evaluation *****");
+//        log.info(eval.stats());
         tm.deleteTempFiles(sc);
 
         for (int i = 0; i < types.size(); i++)
@@ -133,23 +166,117 @@ public class NeuralNet
             System.out.println(i + " -> " + types.get(i));
         }
 
+        trainedNet = sparkNet.getNetwork();
+        save();
+    }
+
+    private void init()
+    {
         File nnDir = new File(Utils.getResource("") + "/neuralnet");
         if (!nnDir.exists())
         {
             nnDir.mkdir();
         }
 
-        File nnFile = new File(nnDir.getAbsolutePath() + "/trained_model.zip");
-        boolean saveUpdaters = true;
-        MultiLayerNetwork network = sparkNet.getNetwork();
+        nnFile = new File(nnDir.getAbsolutePath() + "/trained_model.zip");
+    }
+
+    public void save()
+    {
         try
         {
-            ModelSerializer.writeModel(network, nnFile, saveUpdaters);
+            ModelSerializer.writeModel(trainedNet, nnFile, saveUpdaters);
         }
         catch (IOException e)
         {
             System.out.println("Failed to save neural network.");
         }
+    }
+
+    public void load()
+    {
+        try
+        {
+            trainedNet = ModelSerializer.restoreMultiLayerNetwork(nnFile);
+        }
+        catch (IOException e)
+        {
+            System.out.println("Failed to load neural network.");
+        }
+    }
+
+    public int predict(AISPoint point)
+    {
+        INDArray vector = vectorize(point);
+        INDArray prediction = trainedNet.output(vector, false);
+        System.out.println(prediction);
+        int result[] = trainedNet.predict(vector);
+        return result[0];
+    }
+
+    public INDArray vectorize(AISPoint point)
+    {
+        double data[] = new double[numInputs];
+        data[0] = preprocess("lat", point.lat);
+        data[1] = preprocess("lon", point.lon);
+//        data[2] = preprocess("sog", point.sog);
+//        data[3] = preprocess("cog", point.cog);
+        data[2] = preprocess("type", point.shipType);
+        INDArray vector = Nd4j.create(data);
+
+        return vector;
+    }
+
+    public void evaluateModel(List<RouteObject> testRoutes)
+    {
+        DataSet testData = getTestDataSet(testRoutes);
+        System.out.println("Test examples: " + testData.numExamples());
+        SamplingDataSetIterator testDataIter = new SamplingDataSetIterator(
+                testData, 1, testData.numExamples());
+        Evaluation eval = trainedNet.evaluate(testDataIter);
+        System.out.println("***** Evaluation *****");
+        System.out.println(eval.stats());
+    }
+
+    private DataSet getTestDataSet(List<RouteObject> testRoutes)
+    {
+        int numExamples = 0;
+        for (RouteObject route : testRoutes)
+        {
+            numExamples += route.points.size();
+        }
+
+        int k = 0;
+        double[][] featureData = new double[numExamples][numInputs];
+        float labelData[][] = new float[numExamples][numOutputs];
+        for (RouteObject route : testRoutes)
+        {
+            for (AISPoint point : route.points)
+            {
+                featureData[k][0] = preprocess("lat", point.lat);
+                featureData[k][1] = preprocess("lon", point.lon);
+//                featureData[k][2] = preprocess("sog", point.sog);
+//                featureData[k][3] = preprocess("cog", point.cog);
+                featureData[k][2] = preprocess("type", point.shipType);
+                labelData[k][route.id] = 1;
+                k++;
+            }
+        }
+
+        INDArray features = Nd4j.create(featureData);
+        INDArray labels = Nd4j.create(labelData);
+
+        return new DataSet(features, labels);
+    }
+
+    public MultiLayerNetwork getTrainedNet()
+    {
+        return trainedNet;
+    }
+
+    public void setTrainedNet(MultiLayerNetwork trainedNet)
+    {
+        this.trainedNet = trainedNet;
     }
 
     public DataSet getDataSet()
@@ -164,9 +291,9 @@ public class NeuralNet
             {
                 data[k][0] = preprocess("lat", point.lat);
                 data[k][1] = preprocess("lon", point.lon);
-                data[k][2] = preprocess("sog", point.sog);
-                data[k][3] = preprocess("cog", point.cog);
-                data[k][4] = preprocess("type", point.shipType);
+//                data[k][2] = preprocess("sog", point.sog);
+//                data[k][3] = preprocess("cog", point.cog);
+                data[k][2] = preprocess("type", point.shipType);
                 labelData[k][id] = 1;
                 k++;
             }
@@ -175,12 +302,12 @@ public class NeuralNet
 
         System.out.println("Number of points: " + n);
         System.out.println("2 sample data points:");
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < numInputs; i++)
         {
             System.out.print(data[0][i] + " ");
         }
         System.out.println();
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < numInputs; i++)
         {
             System.out.print(data[1][i] + " ");
         }
@@ -286,22 +413,22 @@ public class NeuralNet
     {
         MultiLayerConfiguration config = new NeuralNetConfiguration.Builder()
                 .seed(seed)
-                .iterations(1)
+                .iterations(iterations)
                 .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
                 .learningRate(learningRate)
-                .regularization(true)
-                .updater(Updater.NESTEROVS).momentum(0.9)
+                .regularization(useRegularization)
+                .updater(Updater.NESTEROVS).momentum(momentum)
                 .list()
                 .layer(0, new DenseLayer.Builder()
                         .nIn(numInputs)
                         .nOut(numHidden)
-                        .weightInit(WeightInit.XAVIER)
-                        .activation(Activation.RELU)
+                        .weightInit(weightInit)
+                        .activation(activation)
                         .build())
                 .layer(1, new OutputLayer.Builder(LossFunction.NEGATIVELOGLIKELIHOOD)
                         .nIn(numHidden)
                         .nOut(numOutputs)
-                        .weightInit(WeightInit.XAVIER)
+                        .weightInit(weightInit)
                         .activation(Activation.SOFTMAX)
                         .build())
                 .pretrain(false).backprop(true).build();

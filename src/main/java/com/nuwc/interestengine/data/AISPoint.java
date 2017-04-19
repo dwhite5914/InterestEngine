@@ -53,6 +53,31 @@ public class AISPoint
         return (float) Math.abs(d / 1.852);  // Convert distance to nautical miles.
     }
 
+    public float getX()
+    {
+        return (float) (lon * 40000 * Math.cos(lat * Math.PI / 360) / 360 / 1.852);
+    }
+
+    public float getY()
+    {
+        return (float) (lat * 40000 / 360 / 1.852);
+    }
+
+    public float getVX()
+    {
+        return (float) (sog * Math.cos(Math.toRadians(cog)));
+    }
+
+    public float getVY()
+    {
+        return (float) (sog * Math.sin(Math.toRadians(cog)));
+    }
+
+    public StateVector toVector()
+    {
+        return new StateVector(getX(), getY(), getVX(), getVY());
+    }
+
     public float getLat()
     {
         return lat;

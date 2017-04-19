@@ -15,16 +15,21 @@ import java.awt.event.KeyListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.Point2D;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.JFrame;
+import javax.swing.JInternalFrame;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JSplitPane;
 import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
-import javax.swing.UnsupportedLookAndFeelException;
 import org.jxmapviewer.JXMapKit;
+import org.jxmapviewer.OSMTileFactoryInfo;
+import org.jxmapviewer.viewer.DefaultTileFactory;
 import org.jxmapviewer.viewer.GeoPosition;
+import org.jxmapviewer.viewer.LocalResponseCache;
+import org.jxmapviewer.viewer.TileFactoryInfo;
 
 public class MainFrame extends JFrame implements KeyListener
 {
@@ -33,6 +38,8 @@ public class MainFrame extends JFrame implements KeyListener
     private static final int MIN_HEIGHT = 800;
     private JXMapKit mapKit;
     private JPanel mapPanel;
+    private JXMapKit miniMap;
+    private SelectionPanel selectionPanel;
     private OptionsPanel optionsPanel;
     private List<Ship> ships;
     private RoutePainter routePainter;
@@ -43,16 +50,6 @@ public class MainFrame extends JFrame implements KeyListener
     {
         // Calls parent class constructor
         super();
-
-        try
-        {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        }
-        catch (ClassNotFoundException | InstantiationException
-                | IllegalAccessException | UnsupportedLookAndFeelException e)
-        {
-            System.out.println("Look and feel not found.");
-        }
 
         initSettings();
         initKeyListener();
@@ -65,6 +62,8 @@ public class MainFrame extends JFrame implements KeyListener
         setTitle("Contact of Interest Engine");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setMinimumSize(new Dimension(MIN_WIDTH, MIN_HEIGHT));
+
+        //setExtendedState(getExtendedState() | JFrame.MAXIMIZED_BOTH);
     }
 
     private void initComponents()
@@ -72,12 +71,24 @@ public class MainFrame extends JFrame implements KeyListener
         /* Initialize options panel with ship list and initial
          * simulation state of stopped.
          */
-        optionsPanel = new OptionsPanel(getShips(), getSimulation(),
-                getMarkers(), getRoutePainter(getMap()), this);
         mapPanel = getMap();
+        miniMap = new JXMapKit();
+        optionsPanel = new OptionsPanel(getShips(), getSimulation(),
+                getMarkers(), getRoutePainter(getMap()), miniMap, this);
+        selectionPanel = new SelectionPanel(getRoutePainter(getMap()), this,
+                optionsPanel);
+        optionsPanel.setSelectionPanel(selectionPanel);
+
         setLayout(new BorderLayout());
-        add(mapPanel, BorderLayout.CENTER);
-        add(optionsPanel, BorderLayout.EAST);
+        JSplitPane sidePanel = new JSplitPane(JSplitPane.VERTICAL_SPLIT, selectionPanel, optionsPanel);
+        sidePanel.setDividerLocation(0.4);
+        sidePanel.setResizeWeight(0.4);
+        sidePanel.setContinuousLayout(true);
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, mapPanel, sidePanel);
+        splitPane.setDividerLocation(0.8);
+        splitPane.setResizeWeight(0.9);
+        splitPane.setContinuousLayout(true);
+        add(splitPane, BorderLayout.CENTER);
     }
 
     private void initKeyListener()
@@ -100,6 +111,17 @@ public class MainFrame extends JFrame implements KeyListener
             mapKit.getMainMap().addMouseMotionListener(mapMouseListener);
             mapKit.setCenterPosition(new GeoPosition(44, 15));
             mapKit.setZoom(12);
+
+            TileFactoryInfo info = new OSMTileFactoryInfo();
+            DefaultTileFactory tileFactory = new DefaultTileFactory(info);
+            tileFactory.setThreadPoolSize(8);
+            mapKit.getMainMap().setTileFactory(tileFactory);
+
+            // Setup local file cache
+            String baseURL = info.getBaseURL();
+            File cacheDir = new File(System.getProperty("user.home")
+                    + File.separator + ".jxmapviewer2");
+            LocalResponseCache.installResponseCache(baseURL, cacheDir, false);
         }
 
         return mapKit;
@@ -110,7 +132,7 @@ public class MainFrame extends JFrame implements KeyListener
         // If no instance of RoutePainter exists, create one
         if (routePainter == null)
         {
-            routePainter = new RoutePainter(getShips(), getMarkers(), map);
+            routePainter = new RoutePainter(getShips(), getMarkers(), map, this);
         }
 
         return routePainter;
@@ -151,6 +173,12 @@ public class MainFrame extends JFrame implements KeyListener
     public void updateMap()
     {
         getMap().repaint();
+    }
+
+    public void updateData()
+    {
+        optionsPanel.updateChart(routePainter);
+        selectionPanel.updateInfo();
     }
 
     private class RouteListener implements RouteChangeListener
@@ -207,28 +235,47 @@ public class MainFrame extends JFrame implements KeyListener
 //                    routePainter.setSelected(newShip, newMarker);
 //                }
 //                optionsPanel.interruptSimulation();
+                boolean madeSelection = false;
+                for (Vessel vessel : routePainter.getVessels())
+                {
+                    if (vessel.contains(e.getPoint()))
+                    {
+                        madeSelection = true;
+                        routePainter.setSelectedVessel(vessel);
+                        selectionPanel.setSelectedVessel(vessel);
+                        updateMap();
+                        break;
+                    }
+                }
+
+                if (!madeSelection && routePainter.getSelectedVessel() != null)
+                {
+                    routePainter.setSelectedVessel(null);
+                    selectionPanel.setSelectedVessel(null);
+                    updateMap();
+                }
             }
             else if (SwingUtilities.isRightMouseButton(e))
             {
-                FIND:
-                for (Ship ship : ships)
-                {
-                    for (Marker marker : ship.getMarkers())
-                    {
-                        Point2D point = map.getMainMap()
-                                .convertGeoPositionToPoint(
-                                        marker.getPosition());
-                        double distance = Point.distance(point.getX(),
-                                point.getY(),
-                                clickPoint.getX(),
-                                clickPoint.getY());
-                        if (distance <= SELECT_THRESH)
-                        {
-                            routePainter.setSelected(ship, marker);
-                            break FIND;
-                        }
-                    }
-                }
+//                FIND:
+//                for (Ship ship : ships)
+//                {
+//                    for (Marker marker : ship.getMarkers())
+//                    {
+//                        Point2D point = map.getMainMap()
+//                                .convertGeoPositionToPoint(
+//                                        marker.getPosition());
+//                        double distance = Point.distance(point.getX(),
+//                                point.getY(),
+//                                clickPoint.getX(),
+//                                clickPoint.getY());
+//                        if (distance <= SELECT_THRESH)
+//                        {
+//                            routePainter.setSelected(ship, marker);
+//                            break FIND;
+//                        }
+//                    }
+//                }
             }
         }
 
@@ -306,14 +353,14 @@ public class MainFrame extends JFrame implements KeyListener
         @Override
         public void mouseMoved(MouseEvent e)
         {
-            Vessel selectedVessel = routePainter.getSelectedVessel();
-            if (selectedVessel == null)
+            Vessel focusedVessel = routePainter.getFocusedVessel();
+            if (focusedVessel == null)
             {
                 for (Vessel vessel : routePainter.getVessels())
                 {
                     if (vessel.contains(e.getPoint()))
                     {
-                        routePainter.setSelectedVessel(vessel);
+                        routePainter.setFocusedVessel(vessel);
                         updateMap();
                         break;
                     }
@@ -321,9 +368,9 @@ public class MainFrame extends JFrame implements KeyListener
             }
             else
             {
-                if (!selectedVessel.contains(e.getPoint()))
+                if (!focusedVessel.contains(e.getPoint()))
                 {
-                    routePainter.setSelectedVessel(null);
+                    routePainter.setFocusedVessel(null);
                     updateMap();
                 }
             }
