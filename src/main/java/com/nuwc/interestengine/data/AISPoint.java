@@ -17,6 +17,7 @@ public class AISPoint
     public PointType type;
     public List<AISPoint> neighbors;
     public Cluster assignedCluster;
+    public boolean anomalous = false;
 
     public AISPoint()
     {

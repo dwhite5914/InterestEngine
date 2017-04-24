@@ -122,7 +122,8 @@ public class JCheckBoxTree extends JTree
     {
         TreeNode[] path = node.getPath();
         TreePath tp = new TreePath(path);
-        CheckedNode cn = new CheckedNode(false, node.getChildCount() > 0, false);
+        CheckedNode cn = new CheckedNode(true, node.getChildCount() > 0, true);
+        checkedPaths.add(tp);
         nodesCheckingState.put(tp, cn);
         for (int i = 0; i < node.getChildCount(); i++)
         {

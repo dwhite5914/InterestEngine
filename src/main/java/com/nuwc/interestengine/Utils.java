@@ -22,7 +22,7 @@ public final class Utils
 
     private static final HashMap<String, String> shipCategory = new HashMap<>();
     private static final HashMap<String, Color> shipColor = new HashMap<>();
-    private static final String shipTypes[] =
+    private static final String shipCategories[] =
     {
         "Cargo Vessel",
         "Tanker",
@@ -34,15 +34,171 @@ public final class Utils
         "Miscellaneous",
         "Unknown"
     };
+    private static final String shipTypes[] =
+    {
+        "Cargo",
+        "CargoHazardousA",
+        "CargoHazardousB",
+        "CargoHazardousC",
+        "CargoHazardousD",
+        "CargoFuture1",
+        "CargoFuture2",
+        "CargoFuture3",
+        "CargoFuture4",
+        "CargoNoAdditionalInfo",
+        "Tanker",
+        "TankerHazardousA",
+        "TankerHazardousB",
+        "TankerHazardousC",
+        "TankerHazardousD",
+        "TankerFuture1",
+        "TankerFuture2",
+        "TankerFuture3",
+        "TankerFuture4",
+        "TankerNoAdditionalInfo",
+        "Passenger",
+        "PassengerHazardousA",
+        "PassengerHazardousB",
+        "PassengerHazardousC",
+        "PassengerHazardousD",
+        "PassengerFuture1",
+        "PassengerFuture2",
+        "PassengerFuture3",
+        "PassengerFuture4",
+        "PassengerNoAdditionalInfo",
+        "HighSpeedCraft",
+        "HighSpeedCraftHarzardousA",
+        "HighSpeedCraftHarzardousB",
+        "HighSpeedCraftHarzardousC",
+        "HighSpeedCraftHarzardousD",
+        "WingInGround",
+        "WingInGroundHazardousA",
+        "WingInGroundHazardousB",
+        "WingInGroundHazardousC",
+        "WingInGroundHazardousD",
+        "Towing",
+        "LargeTowing",
+        "DredgingOrUnderwaterOps",
+        "DivingOps",
+        "MilitaryOps",
+        "PilotVessel",
+        "SearchAndRescueVessel",
+        "Tug",
+        "PortTender",
+        "AntiPollutionEquipment",
+        "LawEnforcement",
+        "SpareLocalVessel1",
+        "SpareLocalVessel2",
+        "MedicalTransport",
+        "ShipAccordingToRRResolutionNo18",
+        "Fishing",
+        "PleasureCraft",
+        "Sailing",
+        "Other",
+        "OtherHazardousA",
+        "OtherHazardousB",
+        "OtherHazardousC",
+        "OtherHazardousD",
+        "OtherFuture1",
+        "OtherFuture2",
+        "OtherFuture3",
+        "OtherFuture4",
+        "OtherNoAdditionalInfo",
+        "NotAvailable",
+        "Unknown"
+    };
+    private static final String shipTypesFormatted[] =
+    {
+        "Cargo",
+        "Cargo Hazardous A",
+        "Cargo Hazardous B",
+        "Cargo Hazardous C",
+        "Cargo Hazardous D",
+        "Cargo Future 1",
+        "Cargo Future 2",
+        "Cargo Future 3",
+        "Cargo Future 4",
+        "Cargo No Additional Info",
+        "Tanker",
+        "Tanker Hazardous A",
+        "Tanker Hazardous B",
+        "Tanker Hazardous C",
+        "Tanker Hazardous D",
+        "Tanker Future 1",
+        "Tanker Future 2",
+        "Tanker Future 3",
+        "Tanker Future 4",
+        "Tanker No Additional Info",
+        "Passenger",
+        "Passenger Hazardous A",
+        "Passenger Hazardous B",
+        "Passenger Hazardous C",
+        "Passenger Hazardous D",
+        "Passenger Future 1",
+        "Passenger Future 2",
+        "Passenger Future 3",
+        "Passenger Future 4",
+        "Passenger No Additional Info",
+        "High Speed Craft",
+        "High Speed Craft Harzardous A",
+        "High Speed Craft Harzardous B",
+        "High Speed Craft Harzardous C",
+        "High Speed Craft Harzardous D",
+        "Wing In Ground",
+        "Wing In Ground Hazardous A",
+        "Wing In Ground Hazardous B",
+        "Wing In Ground Hazardous C",
+        "Wing In Ground Hazardous D",
+        "Towing",
+        "Large Towing",
+        "Dredging Or Underwater Ops",
+        "Diving Ops",
+        "Military Ops",
+        "Pilot Vessel",
+        "Search And Rescue Vessel",
+        "Tug",
+        "Port Tender",
+        "Anti Pollution Equipment",
+        "Law Enforcement",
+        "Spare Local Vessel 1",
+        "Spare Local Vessel 2",
+        "Medical Transport",
+        "Ship According To RR Resolution No 18",
+        "Fishing",
+        "Pleasure Craft",
+        "Sailing",
+        "Other",
+        "Other Hazardous A",
+        "Other Hazardous B",
+        "Other Hazardous C",
+        "Other Hazardous D",
+        "Other Future 1",
+        "Other Future 2",
+        "Other Future 3",
+        "Other Future 4",
+        "Other No Additional Info",
+        "Not Available",
+        "Unknown"
+    };
 
     private Utils()
     {
         // Just a function library.
     }
 
+    public static String[] getShipCategories()
+    {
+        return shipCategories;
+    }
+
     public static String[] getShipTypes()
     {
         return shipTypes;
+    }
+
+    public static String[] getShipTypeFormatted()
+    {
+        return shipTypesFormatted;
     }
 
     public static String getShipCategory(String type)

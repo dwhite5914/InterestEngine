@@ -1194,7 +1194,7 @@
 
                       <Layout class="org.netbeans.modules.form.compat2.layouts.support.JScrollPaneSupportLayout"/>
                       <SubComponents>
-                        <Component class="com.nuwc.interestengine.gui.JCheckBoxTree" name="jCheckBoxTree1">
+                        <Component class="com.nuwc.interestengine.gui.JCheckBoxTree" name="shipTypesCheckBoxTree">
                           <Properties>
                             <Property name="background" type="java.awt.Color" editor="org.netbeans.beaninfo.editors.ColorEditor">
                               <Color blue="f0" green="f0" red="f0" type="rgb"/>
@@ -1205,6 +1205,9 @@
                             <Property name="rootVisible" type="boolean" value="false"/>
                             <Property name="scrollsOnExpand" type="boolean" value="false"/>
                           </Properties>
+                          <Events>
+                            <EventHandler event="checkStateChanged" listener="com.nuwc.interestengine.gui.JCheckBoxTree$CheckChangeEventListener" parameters="com.nuwc.interestengine.gui.JCheckBoxTree$CheckChangeEvent" handler="shipTypesCheckBoxTreeCheckStateChanged"/>
+                          </Events>
                         </Component>
                       </SubComponents>
                     </Container>
@@ -1282,7 +1285,8 @@
                           <EmptySpace max="-2" attributes="0"/>
                           <Group type="103" groupAlignment="0" attributes="0">
                               <Component id="jPanel16" max="32767" attributes="0"/>
-                              <Component id="aisSimulationAccordion" alignment="0" pref="676" max="32767" attributes="0"/>
+                              <Component id="aisSimulationAccordion" alignment="0" max="32767" attributes="0"/>
+                              <Component id="shipTypesChart" alignment="0" max="32767" attributes="0"/>
                           </Group>
                           <EmptySpace max="-2" attributes="0"/>
                       </Group>
@@ -1295,7 +1299,9 @@
                           <Component id="jPanel16" min="-2" pref="38" max="-2" attributes="0"/>
                           <EmptySpace type="unrelated" max="-2" attributes="0"/>
                           <Component id="aisSimulationAccordion" min="-2" pref="326" max="-2" attributes="0"/>
-                          <EmptySpace pref="1670" max="32767" attributes="0"/>
+                          <EmptySpace min="-2" pref="49" max="-2" attributes="0"/>
+                          <Component id="shipTypesChart" min="-2" max="-2" attributes="0"/>
+                          <EmptySpace pref="1396" max="32767" attributes="0"/>
                       </Group>
                   </Group>
                 </DimensionLayout>
@@ -1321,16 +1327,31 @@
                       <Layout>
                         <DimensionLayout dim="0">
                           <Group type="103" groupAlignment="0" attributes="0">
-                              <Group type="102" alignment="0" attributes="0">
+                              <Group type="102" attributes="0">
                                   <EmptySpace max="-2" attributes="0"/>
                                   <Group type="103" groupAlignment="0" attributes="0">
-                                      <Component id="shipTypesChart" max="32767" attributes="0"/>
-                                      <Group type="102" attributes="0">
+                                      <Group type="102" alignment="0" attributes="0">
                                           <Component id="runSimulationButton" min="-2" max="-2" attributes="0"/>
-                                          <EmptySpace max="32767" attributes="0"/>
+                                          <EmptySpace pref="80" max="32767" attributes="0"/>
                                           <Component id="numActiveVesselsLabel" min="-2" max="-2" attributes="0"/>
                                           <EmptySpace type="separate" max="-2" attributes="0"/>
                                           <Component id="numActiveVesselsField" min="-2" pref="100" max="-2" attributes="0"/>
+                                      </Group>
+                                      <Group type="102" attributes="0">
+                                          <Group type="103" groupAlignment="0" attributes="0">
+                                              <Group type="102" alignment="0" attributes="0">
+                                                  <Component id="simulationRateSlider" min="-2" max="-2" attributes="0"/>
+                                                  <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                                                  <Component id="simulationRateValueLabel" min="-2" max="-2" attributes="0"/>
+                                              </Group>
+                                              <Component id="jLabel7" alignment="0" min="-2" max="-2" attributes="0"/>
+                                              <Group type="102" alignment="0" attributes="0">
+                                                  <Component id="jSlider2" min="-2" max="-2" attributes="0"/>
+                                                  <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                                                  <Component id="jLabel8" min="-2" max="-2" attributes="0"/>
+                                              </Group>
+                                          </Group>
+                                          <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
                                       </Group>
                                   </Group>
                                   <EmptySpace max="-2" attributes="0"/>
@@ -1347,8 +1368,18 @@
                                       <Component id="numActiveVesselsField" alignment="3" min="-2" max="-2" attributes="0"/>
                                   </Group>
                                   <EmptySpace type="separate" max="-2" attributes="0"/>
-                                  <Component id="shipTypesChart" min="-2" max="-2" attributes="0"/>
-                                  <EmptySpace max="32767" attributes="0"/>
+                                  <Component id="jLabel7" min="-2" max="-2" attributes="0"/>
+                                  <EmptySpace min="-2" pref="12" max="-2" attributes="0"/>
+                                  <Group type="103" groupAlignment="0" attributes="0">
+                                      <Component id="simulationRateSlider" min="-2" max="-2" attributes="0"/>
+                                      <Component id="simulationRateValueLabel" min="-2" max="-2" attributes="0"/>
+                                  </Group>
+                                  <EmptySpace type="separate" max="-2" attributes="0"/>
+                                  <Group type="103" groupAlignment="0" attributes="0">
+                                      <Component id="jSlider2" min="-2" max="-2" attributes="0"/>
+                                      <Component id="jLabel8" min="-2" max="-2" attributes="0"/>
+                                  </Group>
+                                  <EmptySpace pref="140" max="32767" attributes="0"/>
                               </Group>
                           </Group>
                         </DimensionLayout>
@@ -1375,28 +1406,42 @@
                             <Property name="editable" type="boolean" value="false"/>
                           </Properties>
                         </Component>
-                        <Container class="com.nuwc.interestengine.gui.JChartPanel" name="shipTypesChart">
+                        <Component class="javax.swing.JSlider" name="simulationRateSlider">
                           <Properties>
-                            <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
-                              <Border info="org.netbeans.modules.form.compat2.border.EtchedBorderInfo">
-                                <EtchetBorder/>
-                              </Border>
-                            </Property>
+                            <Property name="majorTickSpacing" type="int" value="100"/>
+                            <Property name="minimum" type="int" value="1"/>
+                            <Property name="minorTickSpacing" type="int" value="1"/>
+                            <Property name="snapToTicks" type="boolean" value="true"/>
+                            <Property name="value" type="int" value="1"/>
                           </Properties>
-
-                          <Layout>
-                            <DimensionLayout dim="0">
-                              <Group type="103" groupAlignment="0" attributes="0">
-                                  <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
-                              </Group>
-                            </DimensionLayout>
-                            <DimensionLayout dim="1">
-                              <Group type="103" groupAlignment="0" attributes="0">
-                                  <EmptySpace min="0" pref="221" max="32767" attributes="0"/>
-                              </Group>
-                            </DimensionLayout>
-                          </Layout>
-                        </Container>
+                          <Events>
+                            <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="simulationRateSliderStateChanged"/>
+                          </Events>
+                        </Component>
+                        <Component class="javax.swing.JLabel" name="simulationRateValueLabel">
+                          <Properties>
+                            <Property name="text" type="java.lang.String" value="1x"/>
+                          </Properties>
+                        </Component>
+                        <Component class="javax.swing.JLabel" name="jLabel7">
+                          <Properties>
+                            <Property name="text" type="java.lang.String" value="Simulation Rate"/>
+                          </Properties>
+                        </Component>
+                        <Component class="javax.swing.JSlider" name="jSlider2">
+                          <Properties>
+                            <Property name="majorTickSpacing" type="int" value="100"/>
+                            <Property name="maximum" type="int" value="300"/>
+                            <Property name="minimum" type="int" value="1"/>
+                            <Property name="minorTickSpacing" type="int" value="1"/>
+                            <Property name="value" type="int" value="10"/>
+                          </Properties>
+                        </Component>
+                        <Component class="javax.swing.JLabel" name="jLabel8">
+                          <Properties>
+                            <Property name="text" type="java.lang.String" value="10"/>
+                          </Properties>
+                        </Component>
                       </SubComponents>
                     </Container>
                   </SubComponents>
@@ -1430,6 +1475,28 @@
                       </Constraints>
                     </Component>
                   </SubComponents>
+                </Container>
+                <Container class="com.nuwc.interestengine.gui.JChartPanel" name="shipTypesChart">
+                  <Properties>
+                    <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
+                      <Border info="org.netbeans.modules.form.compat2.border.EtchedBorderInfo">
+                        <EtchetBorder/>
+                      </Border>
+                    </Property>
+                  </Properties>
+
+                  <Layout>
+                    <DimensionLayout dim="0">
+                      <Group type="103" groupAlignment="0" attributes="0">
+                          <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
+                      </Group>
+                    </DimensionLayout>
+                    <DimensionLayout dim="1">
+                      <Group type="103" groupAlignment="0" attributes="0">
+                          <EmptySpace min="0" pref="221" max="32767" attributes="0"/>
+                      </Group>
+                    </DimensionLayout>
+                  </Layout>
                 </Container>
               </SubComponents>
             </Container>

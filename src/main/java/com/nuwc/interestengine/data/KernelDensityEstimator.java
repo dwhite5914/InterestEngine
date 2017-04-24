@@ -20,6 +20,7 @@ public class KernelDensityEstimator
     private SampleModel xVelYDist;
     private SampleModel yVelXDist;
     private SampleModel yVelYDist;
+    private SampleModel jointVelDist;
 
     private final Color colorScheme[] =
     {
@@ -53,9 +54,67 @@ public class KernelDensityEstimator
             vectors.add(point.toVector());
         }
 
+        calcJointVelocityDist();
         calcPositionDistribution();
         calcVelocityDistribution();
         calcVelocityDists();
+    }
+
+    public void calcJointVelocityDist()
+    {
+        jointVelDist = new SampleModel(forgettingFactor, compressionThreshold);
+
+        int numSamples = vectors.size();
+        SimpleMatrix samples[] = new SimpleMatrix[numSamples];
+        for (int i = 0; i < numSamples; i++)
+        {
+            StateVector vector = vectors.get(i);
+            samples[i] = new SimpleMatrix(new double[][]
+            {
+                {
+                    vector.x
+                },
+                {
+                    vector.y
+                },
+                {
+                    vector.vx
+                },
+                {
+                    vector.vy
+                }
+            });
+        }
+
+        double c[][] = new double[4][4];
+        for (int i = 0; i < 4; i++)
+        {
+            for (int j = 0; j < 4; j++)
+            {
+                c[i][j] = 0;
+            }
+        }
+
+        SimpleMatrix cov[] = new SimpleMatrix[numSamples];
+        double weights[] = new double[numSamples];
+
+        for (int i = 0; i < numSamples; i++)
+        {
+            cov[i] = new SimpleMatrix(c);
+            weights[i] = 1;
+        }
+
+        try
+        {
+            jointVelDist.updateDistribution(samples, cov, weights);
+        }
+        catch (EmptyDistributionException | IllegalArgumentException
+                | InvocationTargetException | NoSuchMethodException
+                | SecurityException | InstantiationException
+                | IllegalAccessException ex)
+        {
+            System.out.println("Failed to update joint velocity distribution.");
+        }
     }
 
     public void calcVelocityDists()
@@ -136,6 +195,25 @@ public class KernelDensityEstimator
         double yVelYProb = yVelYDist.evaluate(toMatrix(vector.y, vector.vy));
 
         return xVelXProb * xVelYProb * yVelXProb * yVelYProb;
+    }
+
+    public double evaluateJointVelocity(StateVector vector)
+    {
+        return jointVelDist.evaluate(new SimpleMatrix(new double[][]
+        {
+            {
+                vector.x
+            },
+            {
+                vector.y
+            },
+            {
+                vector.vx
+            },
+            {
+                vector.vy
+            }
+        }));
     }
 
     public double evaluatePositionConditional(StateVector current, StateVector vector, float radius)

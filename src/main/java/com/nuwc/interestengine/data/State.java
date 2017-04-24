@@ -1,25 +1,23 @@
 package com.nuwc.interestengine.data;
 
-import com.nuwc.interestengine.clustering.RouteObject;
+import com.nuwc.interestengine.clustering.RouteSegment;
 import de.tuhh.luethke.okde.Exceptions.EmptyDistributionException;
-import de.tuhh.luethke.okde.model.BaseSampleDistribution;
 import de.tuhh.luethke.okde.model.SampleModel;
 import java.awt.Color;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
-import javax.swing.JFrame;
 import org.ejml.simple.SimpleMatrix;
-import org.math.plot.Plot3DPanel;
 
 public class State
 {
     private final double forgettingFactor = 1;
     private final double compressionThreshold = 0.02;
+    private final AISPoint center;
     private final float cx;
     private final float cy;
     private final float radius;
-    private final RouteObject route;
+    private final RouteSegment route;
     private List<StateVector> vectors;
     private SampleModel positionDist;
     private SampleModel velocityDist;
@@ -36,10 +34,12 @@ public class State
         Color.RED.darker(),
     };
 
-    public State(float cx, float cy, float radius, RouteObject route)
+    public State(AISPoint center, float radius, RouteSegment route)
     {
-        this.cx = cx;
-        this.cy = cy;
+        StateVector vector = center.toVector();
+        this.center = center;
+        this.cx = vector.x;
+        this.cy = vector.y;
         this.radius = radius;
         this.route = route;
 
@@ -88,6 +88,11 @@ public class State
         {
             cov[i] = new SimpleMatrix(c);
             weights[i] = 1;
+        }
+
+        if (samples.length > 0)
+        {
+            System.out.println("" + samples.length);
         }
 
         // Update distribution with samples:
@@ -269,7 +274,11 @@ public class State
 
         for (AISPoint point : route.points)
         {
-            vectors.add(point.toVector());
+            double dist = center.distance(point);
+            if (dist < radius)
+            {
+                vectors.add(point.toVector());
+            }
         }
     }
 

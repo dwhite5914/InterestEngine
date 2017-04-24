@@ -25,10 +25,20 @@ public class Vessel
 {
     public int mmsi;
     public List<AISPoint> track;
+    public String callSign;
     public String shipName;
     public String shipType;
-    public NavigationStatus navStatus;
+    public Integer toBow;
+    public Integer toStern;
+    public Integer toStarboard;
+    public Integer toPort;
+    public Integer shipLength;
+    public Integer shipWidth;
+    public Integer imo;
     public String destination;
+    public String eta;
+    public Float draught;
+    public NavigationStatus navStatus;
     public ShipStatus status;
     public float averageSpeed;
 
@@ -77,6 +87,14 @@ public class Vessel
         return map.convertGeoPositionToPoint(position);
     }
 
+    public float distanceTo(Vessel vessel)
+    {
+        AISPoint thisPoint = this.last();
+        AISPoint point = vessel.last();
+
+        return thisPoint.distance(point);
+    }
+
     public boolean contains(Point2D point)
     {
         if (lastPoly == null)
@@ -107,7 +125,7 @@ public class Vessel
             scale = AffineTransform.getScaleInstance(1.5, 1.5);
         }
         AffineTransform rotate = AffineTransform
-                .getRotateInstance(Math.toRadians(current.cog));
+                .getRotateInstance(Math.toRadians(current.cog + 180));
         AffineTransform translate = AffineTransform
                 .getTranslateInstance(center.getX(), center.getY());
 
@@ -160,6 +178,17 @@ public class Vessel
             int centerY = yBounds + hBounds / 2;
             drawSelectionBox(g2, centerX, centerY);
         }
+
+        if (current.anomalous)
+        {
+            int xBounds = (int) poly.getBounds2D().getX();
+            int yBounds = (int) poly.getBounds2D().getY();
+            int wBounds = (int) poly.getBounds2D().getWidth();
+            int hBounds = (int) poly.getBounds2D().getHeight();
+            int centerX = xBounds + wBounds / 2;
+            int centerY = yBounds + hBounds / 2;
+            drawAnomalousBox(g2, centerX, centerY);
+        }
     }
 
     private Color addAlpha(Color color, double percentAlpha)
@@ -208,6 +237,17 @@ public class Vessel
         g2.setStroke(oldStroke);
     }
 
+    private void drawAnomalousBox(Graphics2D g2, int centerX, int centerY)
+    {
+        Color oldColor = g2.getColor();
+        g2.setColor(new Color(1f, 0f, 0f, 0.3f));
+        int x = (int) centerX - 18;
+        int y = (int) centerY - 18;
+        int length = 36;
+        g2.fillOval(x, y, length, length);
+        g2.setColor(oldColor);
+    }
+
     private void drawTextBox(Graphics2D g2, int centerX, int centerY, int yBox)
     {
         Color oldColor = g2.getColor();
@@ -217,14 +257,16 @@ public class Vessel
             String.format("MMSI: %d", mmsi),
             String.format("Name: %s",
             (shipName == null) ? "Unknown" : shipName),
-            String.format("Position: (%.2f, %.2f)", current.lat, current.lon),
-            String.format("Speed: %.1f knots", current.sog),
-            String.format("Course: %.0f %s", current.cog, Utils.DEGREE),
+            String.format("Position: (%.2f%s, %.2f%s)", current.lat,
+            Utils.DEGREE, current.lon, Utils.DEGREE),
+            String.format("Speed: %.1fkn", current.sog),
+            String.format("Course: %.0f%s", current.cog, Utils.DEGREE),
             String.format("Type: %s", Utils.getShipCategory(shipType)),
             String.format("Status: %s",
-            (navStatus == null) ? "Undefined" : navStatus),
+            (navStatus == null) ? "Not Available" : navStatus),
             String.format("Destination: %s",
-            (destination == null) ? "Unreported" : destination)
+            (destination == null || destination.equals(""))
+            ? "Not Available" : destination)
         };
         String firstLine = lines[0];
         Font oldFont = g2.getFont();

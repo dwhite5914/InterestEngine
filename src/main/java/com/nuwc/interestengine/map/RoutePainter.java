@@ -15,6 +15,7 @@ import java.awt.Image;
 import java.awt.RenderingHints;
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -39,8 +40,10 @@ public class RoutePainter implements Painter<JXMapViewer>
 
     private Vessel focusedVessel = null;
     private Vessel selectedVessel = null;
+    private boolean drawAnomalousTrack = false;
 
-    private final ConcurrentLinkedQueue<Vessel> vessels = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<Vessel> vessels
+            = new ConcurrentLinkedQueue<>();
     private List<Cluster> clusters = new ArrayList<>();
     private List<RouteObject> routes = new ArrayList<>();
     private List<AISPoint> dataPoints = new ArrayList<>();
@@ -62,10 +65,13 @@ public class RoutePainter implements Painter<JXMapViewer>
     private boolean drawEntryPoints = false;
     private boolean drawExitPoints = false;
     private boolean drawStopPoints = false;
+    private List<String> allowedShipTypes
+            = Arrays.asList(Utils.getShipTypes());
 
     private RouteObject bestRoute = null;
 
-    public RoutePainter(List<Ship> ships, List<TriMarker> markers, JXMapKit map, MainFrame mainFrame)
+    public RoutePainter(List<Ship> ships, List<TriMarker> markers,
+            JXMapKit map, MainFrame mainFrame)
     {
         this.ships = ships;
         this.map = map;
@@ -218,6 +224,25 @@ public class RoutePainter implements Painter<JXMapViewer>
     {
         this.bestRoute = bestRoute;
         map.repaint();
+    }
+
+    public List<String> getAllowedShipTypes()
+    {
+        return allowedShipTypes;
+    }
+
+    public void setAllowedShipTypes(List<String> allowedShipTypes)
+    {
+        for (String type : allowedShipTypes)
+        {
+            System.out.println(type);
+        }
+        this.allowedShipTypes = allowedShipTypes;
+        map.repaint();
+        for (String type : allowedShipTypes)
+        {
+            System.out.println(type);
+        }
     }
 
     public void drawDataPoints(Graphics2D g, JXMapViewer map)
@@ -464,10 +489,16 @@ public class RoutePainter implements Painter<JXMapViewer>
     {
         for (Vessel vessel : vessels)
         {
+            String shipType = vessel.shipType;
+            if (shipType == null)
+            {
+                shipType = "NotAvailable";
+            }
             if (vessel.track.size() > 0
                     && vessel != focusedVessel
                     && vessel != selectedVessel
-                    && Utils.isAnchored(vessel.navStatus))
+                    && Utils.isAnchored(vessel.navStatus)
+                    && allowedShipTypes.contains(shipType))
             {
                 vessel.draw(g, map, false, false);
             }
@@ -475,10 +506,16 @@ public class RoutePainter implements Painter<JXMapViewer>
 
         for (Vessel vessel : vessels)
         {
+            String shipType = vessel.shipType;
+            if (shipType == null)
+            {
+                shipType = "Unknown";
+            }
             if (vessel.track.size() > 0
                     && vessel != focusedVessel
                     && vessel != selectedVessel
-                    && !Utils.isAnchored(vessel.navStatus))
+                    && !Utils.isAnchored(vessel.navStatus)
+                    && allowedShipTypes.contains(shipType))
             {
                 vessel.draw(g, map, false, false);
             }
@@ -486,11 +523,51 @@ public class RoutePainter implements Painter<JXMapViewer>
 
         if (selectedVessel != null)
         {
-            selectedVessel.draw(g, map, false, true);
+            String shipType = selectedVessel.shipType;
+            if (shipType == null)
+            {
+                shipType = "Unknown";
+            }
+            if (!allowedShipTypes.contains(shipType))
+            {
+                selectedVessel = null;
+            }
         }
 
         if (focusedVessel != null)
         {
+            String shipType = focusedVessel.shipType;
+            if (shipType == null)
+            {
+                shipType = "Unknown";
+            }
+            if (!allowedShipTypes.contains(shipType))
+            {
+                focusedVessel = null;
+            }
+        }
+
+        if (selectedVessel != null)
+        {
+            selectedVessel.draw(g, map, false, true);
+            if (drawAnomalousTrack)
+            {
+                for (AISPoint point : selectedVessel.track)
+                {
+                    GeoPosition position = new GeoPosition(point.lat, point.lon);
+                    Point2D mapPoint = map.convertGeoPositionToPoint(position);
+                    Color color = point.anomalous ? Color.RED : Color.BLUE;
+                    paintMarker(g, mapPoint, color);
+                }
+            }
+        }
+
+        if (focusedVessel != null)
+        {
+            if (!allowedShipTypes.contains(focusedVessel.shipType))
+            {
+                selectedVessel = null;
+            }
             focusedVessel.draw(g, map, true, false);
         }
     }
@@ -601,6 +678,16 @@ public class RoutePainter implements Painter<JXMapViewer>
     public void setSelectedVessel(Vessel selectedVessel)
     {
         this.selectedVessel = selectedVessel;
+    }
+
+    public boolean isDrawAnomalousTrack()
+    {
+        return drawAnomalousTrack;
+    }
+
+    public void setDrawAnomalousTrack(boolean drawAnomalousTrack)
+    {
+        this.drawAnomalousTrack = drawAnomalousTrack;
     }
 
     private ImageIcon getStartMarkerIcon()

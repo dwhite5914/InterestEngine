@@ -8,7 +8,7 @@ import org.jxmapviewer.viewer.GeoPosition;
 
 public class Cell
 {
-    private float minLat, maxLat, minLon, maxLon;
+    public float minLat, maxLat, minLon, maxLon;
     private Color color;
 
     public Cell(float minLat, float maxLat, float minLon, float maxLon)
@@ -24,6 +24,17 @@ public class Cell
         this.minLon = minLon;
         this.maxLon = maxLon;
         this.color = color;
+    }
+
+    public boolean contains(AISPoint point)
+    {
+        if (minLat <= point.lat && point.lat < maxLat
+                && minLon <= point.lon && point.lon < maxLon)
+        {
+            return true;
+        }
+
+        return false;
     }
 
     public Color getColor()

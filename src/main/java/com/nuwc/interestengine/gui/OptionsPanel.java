@@ -5,6 +5,7 @@ import com.nuwc.interestengine.data.Database;
 import com.nuwc.interestengine.clustering.RouteExtractor;
 import com.nuwc.interestengine.clustering.RouteObject;
 import com.nuwc.interestengine.clustering.Vessel;
+import com.nuwc.interestengine.data.AISPoint;
 import com.nuwc.interestengine.map.RoutePainter;
 import com.nuwc.interestengine.parser.NMEAParser;
 import com.nuwc.interestengine.map.Ship;
@@ -19,7 +20,9 @@ import com.nuwc.interestengine.simulator.VesselManager;
 import java.awt.Color;
 import java.awt.Font;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -31,14 +34,15 @@ import javax.swing.JPanel;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableModel;
-import org.deeplearning4j.nn.weights.WeightInit;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.TreeNode;
+import javax.swing.tree.TreePath;
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.plot.PiePlot;
 import org.jfree.data.general.DefaultPieDataset;
 import org.jxmapviewer.JXMapKit;
 import org.jxmapviewer.viewer.GeoPosition;
-import org.nd4j.linalg.activations.Activation;
 
 public class OptionsPanel extends javax.swing.JPanel
 {
@@ -48,21 +52,17 @@ public class OptionsPanel extends javax.swing.JPanel
     private final RoutePainter routePainter;
     private final MainFrame mainFrame;
     private final Database db;
-    private SelectionPanel selectionPanel;
 
+    private SelectionPanel selectionPanel;
+    private VesselFrame vesselFrame;
+
+    private RouteExtractor extractor;
     private VesselManager manager;
     private MessageProducer producer;
     private MessageConsumer consumer;
 
     private JFreeChart pieChart;
     private DefaultPieDataset pieData;
-
-    private final Color defaultColorClusters = Color.RED;
-    private final Color defaultColorRoutes = Color.BLUE;
-    private final Color defaultColorDataPoints = Color.BLACK;
-    private final Color defaultColorEntryPoints = Color.CYAN;
-    private final Color defaultColorExitPoints = Color.MAGENTA;
-    private final Color defaultColorStopPoints = Color.GREEN;
 
     private Color colorClusters = null;
     private Color colorRoutes = null;
@@ -98,6 +98,11 @@ public class OptionsPanel extends javax.swing.JPanel
         updateTables();
     }
 
+    public RouteExtractor getExtractor()
+    {
+        return extractor;
+    }
+
     public SelectionPanel getSelectionPanel()
     {
         return selectionPanel;
@@ -106,6 +111,16 @@ public class OptionsPanel extends javax.swing.JPanel
     public void setSelectionPanel(SelectionPanel selectionPanel)
     {
         this.selectionPanel = selectionPanel;
+    }
+
+    public VesselFrame getVesselFrame()
+    {
+        return vesselFrame;
+    }
+
+    public void setVesselFrame(VesselFrame vesselFrame)
+    {
+        this.vesselFrame = vesselFrame;
     }
 
     public NeuralNet getNeuralNet()
@@ -240,6 +255,12 @@ public class OptionsPanel extends javax.swing.JPanel
         shipTypesChart.repaint();
     }
 
+    public void checkAnomaly(Vessel vessel)
+    {
+        AISPoint point = vessel.last();
+        point.anomalous = selectionPanel.isAnomaly(vessel);
+    }
+
     public void interruptSimulation()
     {
         if (simulation.getState() != SimulationState.STOPPED)
@@ -281,6 +302,11 @@ public class OptionsPanel extends javax.swing.JPanel
 //            stopButton.setEnabled(true);
 //            playPauseButton.setEnabled(true);
 //        }
+    }
+
+    public void updateInfo()
+    {
+        vesselFrame.updateTables();
     }
 
     private void updateTables()
@@ -476,7 +502,7 @@ public class OptionsPanel extends javax.swing.JPanel
         jColorButton3 = new com.nuwc.interestengine.gui.JColorButton();
         foldablePanel2 = new com.nuwc.interestengine.gui.FoldablePanel();
         jScrollPane6 = new javax.swing.JScrollPane();
-        jCheckBoxTree1 = new com.nuwc.interestengine.gui.JCheckBoxTree();
+        shipTypesCheckBoxTree = new com.nuwc.interestengine.gui.JCheckBoxTree();
         jPanel15 = new javax.swing.JPanel();
         jLabel3 = new javax.swing.JLabel();
         jScrollPane3 = new javax.swing.JScrollPane();
@@ -486,9 +512,14 @@ public class OptionsPanel extends javax.swing.JPanel
         runSimulationButton = new javax.swing.JButton();
         numActiveVesselsLabel = new javax.swing.JLabel();
         numActiveVesselsField = new javax.swing.JTextField();
-        shipTypesChart = new com.nuwc.interestengine.gui.JChartPanel();
+        simulationRateSlider = new javax.swing.JSlider();
+        simulationRateValueLabel = new javax.swing.JLabel();
+        jLabel7 = new javax.swing.JLabel();
+        jSlider2 = new javax.swing.JSlider();
+        jLabel8 = new javax.swing.JLabel();
         jPanel16 = new javax.swing.JPanel();
         jLabel4 = new javax.swing.JLabel();
+        shipTypesChart = new com.nuwc.interestengine.gui.JChartPanel();
         jScrollPane4 = new javax.swing.JScrollPane();
         jPanel11 = new javax.swing.JPanel();
         jPanel17 = new javax.swing.JPanel();
@@ -1152,7 +1183,7 @@ public class OptionsPanel extends javax.swing.JPanel
 
         foldablePanel2.setTitle("Ship Type");
 
-        jCheckBoxTree1.setBackground(new java.awt.Color(240, 240, 240));
+        shipTypesCheckBoxTree.setBackground(new java.awt.Color(240, 240, 240));
         javax.swing.tree.DefaultMutableTreeNode treeNode1 = new javax.swing.tree.DefaultMutableTreeNode("root");
         javax.swing.tree.DefaultMutableTreeNode treeNode2 = new javax.swing.tree.DefaultMutableTreeNode("Cargo Vessel");
         javax.swing.tree.DefaultMutableTreeNode treeNode3 = new javax.swing.tree.DefaultMutableTreeNode("Cargo Hazardous A");
@@ -1308,10 +1339,17 @@ public class OptionsPanel extends javax.swing.JPanel
         treeNode1.add(treeNode2);
         treeNode2 = new javax.swing.tree.DefaultMutableTreeNode("Unknown");
         treeNode1.add(treeNode2);
-        jCheckBoxTree1.setModel(new javax.swing.tree.DefaultTreeModel(treeNode1));
-        jCheckBoxTree1.setRootVisible(false);
-        jCheckBoxTree1.setScrollsOnExpand(false);
-        jScrollPane6.setViewportView(jCheckBoxTree1);
+        shipTypesCheckBoxTree.setModel(new javax.swing.tree.DefaultTreeModel(treeNode1));
+        shipTypesCheckBoxTree.setRootVisible(false);
+        shipTypesCheckBoxTree.setScrollsOnExpand(false);
+        shipTypesCheckBoxTree.addCheckChangeEventListener(new com.nuwc.interestengine.gui.JCheckBoxTree.CheckChangeEventListener()
+        {
+            public void checkStateChanged(com.nuwc.interestengine.gui.JCheckBoxTree.CheckChangeEvent evt)
+            {
+                shipTypesCheckBoxTreeCheckStateChanged(evt);
+            }
+        });
+        jScrollPane6.setViewportView(shipTypesCheckBoxTree);
 
         foldablePanel2.add(jScrollPane6, java.awt.BorderLayout.CENTER);
 
@@ -1375,18 +1413,30 @@ public class OptionsPanel extends javax.swing.JPanel
 
         numActiveVesselsField.setEditable(false);
 
-        shipTypesChart.setBorder(javax.swing.BorderFactory.createEtchedBorder());
+        simulationRateSlider.setMajorTickSpacing(100);
+        simulationRateSlider.setMinimum(1);
+        simulationRateSlider.setMinorTickSpacing(1);
+        simulationRateSlider.setSnapToTicks(true);
+        simulationRateSlider.setValue(1);
+        simulationRateSlider.addChangeListener(new javax.swing.event.ChangeListener()
+        {
+            public void stateChanged(javax.swing.event.ChangeEvent evt)
+            {
+                simulationRateSliderStateChanged(evt);
+            }
+        });
 
-        javax.swing.GroupLayout shipTypesChartLayout = new javax.swing.GroupLayout(shipTypesChart);
-        shipTypesChart.setLayout(shipTypesChartLayout);
-        shipTypesChartLayout.setHorizontalGroup(
-            shipTypesChartLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 0, Short.MAX_VALUE)
-        );
-        shipTypesChartLayout.setVerticalGroup(
-            shipTypesChartLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 221, Short.MAX_VALUE)
-        );
+        simulationRateValueLabel.setText("1x");
+
+        jLabel7.setText("Simulation Rate");
+
+        jSlider2.setMajorTickSpacing(100);
+        jSlider2.setMaximum(300);
+        jSlider2.setMinimum(1);
+        jSlider2.setMinorTickSpacing(1);
+        jSlider2.setValue(10);
+
+        jLabel8.setText("10");
 
         javax.swing.GroupLayout jPanel2Layout = new javax.swing.GroupLayout(jPanel2);
         jPanel2.setLayout(jPanel2Layout);
@@ -1395,13 +1445,24 @@ public class OptionsPanel extends javax.swing.JPanel
             .addGroup(jPanel2Layout.createSequentialGroup()
                 .addContainerGap()
                 .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(shipTypesChart, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addGroup(jPanel2Layout.createSequentialGroup()
                         .addComponent(runSimulationButton)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 80, Short.MAX_VALUE)
                         .addComponent(numActiveVesselsLabel)
                         .addGap(18, 18, 18)
-                        .addComponent(numActiveVesselsField, javax.swing.GroupLayout.PREFERRED_SIZE, 100, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                        .addComponent(numActiveVesselsField, javax.swing.GroupLayout.PREFERRED_SIZE, 100, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addGroup(jPanel2Layout.createSequentialGroup()
+                        .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addGroup(jPanel2Layout.createSequentialGroup()
+                                .addComponent(simulationRateSlider, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                .addComponent(simulationRateValueLabel))
+                            .addComponent(jLabel7)
+                            .addGroup(jPanel2Layout.createSequentialGroup()
+                                .addComponent(jSlider2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                .addComponent(jLabel8)))
+                        .addGap(0, 0, Short.MAX_VALUE)))
                 .addContainerGap())
         );
         jPanel2Layout.setVerticalGroup(
@@ -1413,8 +1474,16 @@ public class OptionsPanel extends javax.swing.JPanel
                     .addComponent(numActiveVesselsLabel)
                     .addComponent(numActiveVesselsField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addGap(18, 18, 18)
-                .addComponent(shipTypesChart, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addComponent(jLabel7)
+                .addGap(12, 12, 12)
+                .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(simulationRateSlider, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(simulationRateValueLabel))
+                .addGap(18, 18, 18)
+                .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(jSlider2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(jLabel8))
+                .addContainerGap(140, Short.MAX_VALUE))
         );
 
         aisSimulationAccordion.add(jPanel2, java.awt.BorderLayout.CENTER);
@@ -1428,6 +1497,19 @@ public class OptionsPanel extends javax.swing.JPanel
         jLabel4.setText("Simulation");
         jPanel16.add(jLabel4, java.awt.BorderLayout.CENTER);
 
+        shipTypesChart.setBorder(javax.swing.BorderFactory.createEtchedBorder());
+
+        javax.swing.GroupLayout shipTypesChartLayout = new javax.swing.GroupLayout(shipTypesChart);
+        shipTypesChart.setLayout(shipTypesChartLayout);
+        shipTypesChartLayout.setHorizontalGroup(
+            shipTypesChartLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGap(0, 0, Short.MAX_VALUE)
+        );
+        shipTypesChartLayout.setVerticalGroup(
+            shipTypesChartLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGap(0, 221, Short.MAX_VALUE)
+        );
+
         javax.swing.GroupLayout jPanel6Layout = new javax.swing.GroupLayout(jPanel6);
         jPanel6.setLayout(jPanel6Layout);
         jPanel6Layout.setHorizontalGroup(
@@ -1436,7 +1518,8 @@ public class OptionsPanel extends javax.swing.JPanel
                 .addContainerGap()
                 .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(jPanel16, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(aisSimulationAccordion, javax.swing.GroupLayout.DEFAULT_SIZE, 676, Short.MAX_VALUE))
+                    .addComponent(aisSimulationAccordion, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(shipTypesChart, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                 .addContainerGap())
         );
         jPanel6Layout.setVerticalGroup(
@@ -1446,7 +1529,9 @@ public class OptionsPanel extends javax.swing.JPanel
                 .addComponent(jPanel16, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addComponent(aisSimulationAccordion, javax.swing.GroupLayout.PREFERRED_SIZE, 326, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(1670, Short.MAX_VALUE))
+                .addGap(49, 49, 49)
+                .addComponent(shipTypesChart, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(1396, Short.MAX_VALUE))
         );
 
         jScrollPane3.setViewportView(jPanel6);
@@ -1518,9 +1603,14 @@ public class OptionsPanel extends javax.swing.JPanel
             int entryMinPoints = Integer.parseInt(entryMinPointsField.getText());
             int exitMinPoints = Integer.parseInt(exitMinPointsField.getText());
             int stopMinPoints = Integer.parseInt(stopMinPointsField.getText());
-            RouteExtractor extractor = new RouteExtractor(db, routePainter,
+            float minLat = ((Double) minLatSpinner.getValue()).floatValue();
+            float maxLat = ((Double) maxLatSpinner.getValue()).floatValue();
+            float minLon = ((Double) minLonSpinner.getValue()).floatValue();
+            float maxLon = ((Double) maxLonSpinner.getValue()).floatValue();
+            extractor = new RouteExtractor(db, routePainter,
                     mainFrame, lostTime, minSpeed, entryEpsilon, entryMinPoints,
-                    exitEpsilon, exitMinPoints, stopEpsilon, stopMinPoints);
+                    exitEpsilon, exitMinPoints, stopEpsilon, stopMinPoints,
+                    minLat, minLon, maxLat, maxLon);
             routes = extractor.run();
 
             System.out.println("Actual Routes: " + routes.size());
@@ -1534,28 +1624,9 @@ public class OptionsPanel extends javax.swing.JPanel
             }
             System.out.println("Total points: " + numPoints);
 
+            selectionPanel.setRouteTree(extractor.getRouteTree());
             selectionPanel.train();
             selectionPanel.evaluateAccuracy();
-
-//            oversampledRoutes = extractor.getOversampledRoutes();
-//            System.out.println("Oversampled Routes: " + oversampledRoutes.size());
-//            numPoints = 0;
-//            for (RouteObject route : oversampledRoutes)
-//            {
-//                numPoints += route.points.size();
-//                System.out.println("Route ID " + route.id + ": " + route.points.size());
-//            }
-//            System.out.println("Total points: " + numPoints);
-//
-//            int inputs = 3;
-//            int hidden = 50;
-//            int outputs = oversampledRoutes.size();
-//            network = new NeuralNet(inputs, hidden, outputs, oversampledRoutes);
-//            network.load();
-//            if (network.getTrainedNet() != null)
-//            {
-//                network.evaluateModel(routes);
-//            }
         }
         else
         {
@@ -1587,8 +1658,9 @@ public class OptionsPanel extends javax.swing.JPanel
             float maxLon = ((Double) maxLonSpinner.getValue()).floatValue();
 
             ConcurrentLinkedQueue messageQueue = new ConcurrentLinkedQueue();
-            manager = new VesselManager(minLat, maxLat, minLon, maxLon, routePainter);
+            manager = new VesselManager(minLat, maxLat, minLon, maxLon, this, routePainter);
             producer = new MessageProducer(files, messageQueue);
+            producer.setSimRate(simulationRateSlider.getValue());
             consumer = new MessageConsumer(messageQueue, manager);
             Thread producerThread = new Thread(producer);
             Thread consumerThread = new Thread(consumer);
@@ -1612,51 +1684,6 @@ public class OptionsPanel extends javax.swing.JPanel
                     return;
                 }
             }
-
-            int epochs = Integer.parseInt(epochsField.getText());
-            int batchSize = Integer.parseInt(batchSizeField.getText());
-            double learningRate = Double.parseDouble(learningRateField.getText());
-            double momentum = Double.parseDouble(momentumField.getText());
-            int iterations = Integer.parseInt(iterationsField.getText());
-            boolean useRegularization = regularizationCheckBox.isSelected();
-            Activation activation;
-            switch ((String) activationFunctionCombo.getSelectedItem())
-            {
-                case "Sigmoid":
-                    activation = Activation.SIGMOID;
-                    break;
-                case "Tanh":
-                    activation = Activation.TANH;
-                    break;
-                default:
-                    activation = Activation.RELU;
-            }
-            WeightInit weightInit;
-            switch ((String) weightInitCombo.getSelectedItem())
-            {
-                case "Relu":
-                    weightInit = WeightInit.RELU;
-                    break;
-                case "Uniform":
-                    weightInit = WeightInit.UNIFORM;
-                    break;
-                default:
-                    weightInit = WeightInit.XAVIER;
-            }
-            int inputs = 3;
-            int hidden = 50;
-            int outputs = oversampledRoutes.size();
-
-            for (RouteObject route : oversampledRoutes)
-            {
-                System.out.println(route.points.size());
-            }
-            network = new NeuralNet(inputs, hidden, outputs, epochs, batchSize,
-                    learningRate, momentum, iterations, useRegularization,
-                    activation, weightInit, oversampledRoutes);
-            network.train();
-            network.evaluateModel(routes);
-            System.out.println("***** COMPLETE *****");
         }
         else
         {
@@ -1796,6 +1823,44 @@ public class OptionsPanel extends javax.swing.JPanel
         // TODO add your handling code here:
     }//GEN-LAST:event_jTextField14ActionPerformed
 
+    private void simulationRateSliderStateChanged(javax.swing.event.ChangeEvent evt)//GEN-FIRST:event_simulationRateSliderStateChanged
+    {//GEN-HEADEREND:event_simulationRateSliderStateChanged
+        int simRate = simulationRateSlider.getValue();
+        producer.setSimRate(simRate);
+        simulationRateValueLabel.setText(String.format("%dx", simRate));
+    }//GEN-LAST:event_simulationRateSliderStateChanged
+
+    private void shipTypesCheckBoxTreeCheckStateChanged(com.nuwc.interestengine.gui.JCheckBoxTree.CheckChangeEvent evt)//GEN-FIRST:event_shipTypesCheckBoxTreeCheckStateChanged
+    {//GEN-HEADEREND:event_shipTypesCheckBoxTreeCheckStateChanged
+        List<String> shipTypes = new ArrayList<>();
+        for (TreePath treePath : shipTypesCheckBoxTree.getCheckedPaths())
+        {
+            Object components[] = treePath.getPath();
+            if (components.length == 3)
+            {
+                String shipCategory = components[1].toString();
+                String shipType = components[2].toString();
+                if (shipType.equals("Other")
+                        && !shipCategory.equals("Miscellaneous"))
+                {
+                    shipType = shipCategory;
+                }
+                shipTypes.add(shipType.replaceAll(" ", ""));
+            }
+            else if (components.length == 2)
+            {
+                String shipType = components[1].toString();
+                if (shipType.equals("Unknown"))
+                {
+                    shipTypes.add("NotAvailable");
+                }
+                shipTypes.add(shipType.replaceAll(" ", ""));
+            }
+        }
+
+        routePainter.setAllowedShipTypes(shipTypes);
+    }//GEN-LAST:event_shipTypesCheckBoxTreeCheckStateChanged
+
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JPanel AnalysisSettingsPanel;
     private javax.swing.JPanel AnalysisSettingsPanel2;
@@ -1819,7 +1884,6 @@ public class OptionsPanel extends javax.swing.JPanel
     private javax.swing.JCheckBox jCheckBox5;
     private javax.swing.JCheckBox jCheckBox6;
     private javax.swing.JCheckBox jCheckBox7;
-    private com.nuwc.interestengine.gui.JCheckBoxTree jCheckBoxTree1;
     private com.nuwc.interestengine.gui.JColorButton jColorButton1;
     private com.nuwc.interestengine.gui.JColorButton jColorButton2;
     private com.nuwc.interestengine.gui.JColorButton jColorButton3;
@@ -1833,6 +1897,8 @@ public class OptionsPanel extends javax.swing.JPanel
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
     private javax.swing.JLabel jLabel5;
+    private javax.swing.JLabel jLabel7;
+    private javax.swing.JLabel jLabel8;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel10;
     private javax.swing.JPanel jPanel11;
@@ -1856,6 +1922,7 @@ public class OptionsPanel extends javax.swing.JPanel
     private javax.swing.JScrollPane jScrollPane4;
     private javax.swing.JScrollPane jScrollPane5;
     private javax.swing.JScrollPane jScrollPane6;
+    private javax.swing.JSlider jSlider2;
     private javax.swing.JTabbedPane jTabbedPane1;
     private javax.swing.JTextField jTextField1;
     private javax.swing.JTextField jTextField10;
@@ -1901,6 +1968,9 @@ public class OptionsPanel extends javax.swing.JPanel
     private javax.swing.JLabel numVesselsLabel;
     private javax.swing.JButton runSimulationButton;
     private com.nuwc.interestengine.gui.JChartPanel shipTypesChart;
+    private com.nuwc.interestengine.gui.JCheckBoxTree shipTypesCheckBoxTree;
+    private javax.swing.JSlider simulationRateSlider;
+    private javax.swing.JLabel simulationRateValueLabel;
     private javax.swing.JTextField stopEpsilonField;
     private javax.swing.JTextField stopMinPointsField;
     private javax.swing.JButton trainNetworkButton;

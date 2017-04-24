@@ -2,11 +2,14 @@ package com.nuwc.interestengine.gui;
 
 import com.nuwc.interestengine.Utils;
 import com.nuwc.interestengine.clustering.RouteObject;
+import com.nuwc.interestengine.clustering.RouteSegment;
 import com.nuwc.interestengine.clustering.Vessel;
 import com.nuwc.interestengine.data.AISPoint;
 import com.nuwc.interestengine.data.Cell;
 import com.nuwc.interestengine.data.KernelDensityEstimator;
+import com.nuwc.interestengine.data.State;
 import com.nuwc.interestengine.data.StateVector;
+import com.nuwc.interestengine.data.TreeNode;
 import com.nuwc.interestengine.map.RoutePainter;
 import java.awt.Color;
 import java.util.ArrayList;
@@ -21,15 +24,32 @@ public class SelectionPanel extends javax.swing.JPanel
     private MainFrame mainFrame;
     private OptionsPanel optionsPanel;
     private RouteObject bestRoute;
+    private VesselFrame vesselFrame;
+    private TreeNode routeTree;
+
+    private double probSoftMax = 0;
+    private double probMean = 0;
+    private double probStdev = 0;
+
+    private double posProbMax = 0;
+    private double velProbMax = 0;
+    private double velStdev = 0;
 
     public SelectionPanel(RoutePainter routePainter, MainFrame mainFrame,
-            OptionsPanel optionsPanel)
+            OptionsPanel optionsPanel, VesselFrame vesselFrame)
     {
         this.routePainter = routePainter;
         this.mainFrame = mainFrame;
         this.optionsPanel = optionsPanel;
 
+        this.vesselFrame = vesselFrame;
+
         initComponents();
+    }
+
+    public void setRouteTree(TreeNode routeTree)
+    {
+        this.routeTree = routeTree;
     }
 
     public void train()
@@ -41,6 +61,215 @@ public class SelectionPanel extends javax.swing.JPanel
             route.kde.fit(route);
         }
         System.out.println("-----------Trained-----------");
+
+        List<Double> posProbs = new ArrayList<>();
+        double maxPosProb = 0;
+        double meanPosProb = 0;
+        double stdevPosProb = 0;
+        int numPoints = 0;
+
+        List<Double> velProbs = new ArrayList<>();
+        double meanVelProb = 0;
+        double maxVelProb = 0;
+
+        for (RouteObject route : routes)
+        {
+            for (AISPoint point : route.points)
+            {
+                StateVector vector = point.toVector();
+                double posProb = route.kde.evaluatePositionConditional(vector, vector, 1);
+                double velProb = route.kde.evaluateJointVelocity(vector);
+                posProbs.add(posProb);
+                velProbs.add(velProb);
+                if (posProb > maxPosProb)
+                {
+                    maxPosProb = posProb;
+                }
+                if (velProb > maxVelProb)
+                {
+                    maxVelProb = velProb;
+                }
+                numPoints++;
+            }
+        }
+
+        for (double prob : posProbs)
+        {
+            meanPosProb += prob;
+        }
+        meanPosProb /= numPoints;
+
+        for (double prob : velProbs)
+        {
+            meanVelProb += prob;
+        }
+        meanVelProb /= numPoints;
+
+        for (double prob : posProbs)
+        {
+            stdevPosProb += Math.pow(prob - meanPosProb, 2);
+        }
+        stdevPosProb /= numPoints;
+
+        double stdevVelProb = 0;
+        for (double prob : velProbs)
+        {
+            stdevVelProb += Math.pow(prob - meanVelProb, 2);
+        }
+        stdevVelProb /= numPoints;
+
+        posProbMax = meanPosProb;
+        velProbMax = meanVelProb;
+        velStdev = stdevVelProb;
+
+        probSoftMax = meanPosProb + 3 * stdevPosProb;
+        probMean = meanPosProb;
+        probStdev = stdevPosProb;
+    }
+
+    public boolean isAnomaly(Vessel v)
+    {
+        AISPoint point = v.last();
+        StateVector vector = point.toVector();
+        RouteObject bestRoute = calcBestRouteForPoint(point);
+        int numPoints = bestRoute.points.size();
+        AnomalyChecker checkers[] = new AnomalyChecker[8];
+        for (int i = 0; i < 8; i++)
+        {
+            checkers[i] = new AnomalyChecker(i, point, bestRoute);
+            checkers[i].start();
+        }
+
+        for (int i = 0; i < 8; i++)
+        {
+            try
+            {
+                checkers[i].join();
+            }
+            catch (InterruptedException e)
+            {
+                System.out.println("Thread failed to join.");
+            }
+        }
+
+        double minDist = 5;
+        for (int i = 0; i < 8; i++)
+        {
+            double dist = checkers[i].getMinDist();
+            if (dist < minDist)
+            {
+                minDist = dist;
+            }
+        }
+
+        if (minDist < 4 || Utils.isAnchored(v.navStatus) || v.last().sog < 0.12)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private class AnomalyChecker extends Thread
+    {
+        private int start, end;
+        private AISPoint point;
+        private RouteObject route;
+        private double minDist;
+
+        public AnomalyChecker(int i, AISPoint point, RouteObject route)
+        {
+            int numPoints = route.points.size();
+            start = i * (numPoints / 8);
+            end = start + (numPoints / 8);
+            if (end >= numPoints)
+            {
+                end = numPoints - 1;
+            }
+            this.point = point;
+            this.route = route;
+        }
+
+        public double getMinDist()
+        {
+            return minDist;
+        }
+
+        @Override
+        public void run()
+        {
+            minDist = 5;
+            for (int i = start; i <= end; i++)
+            {
+                AISPoint routePoint = route.points.get(i);
+                double dist = point.distance(routePoint);
+                if (dist < minDist)
+                {
+                    minDist = dist;
+                }
+            }
+        }
+
+    }
+
+    public RouteObject getBestRoute()
+    {
+        List<RouteObject> routes = optionsPanel.getRoutes();
+        StateVector vector = selectedVessel.last().toVector();
+        List<RouteSegment> segments = new ArrayList<>();
+        for (RouteObject route : routes)
+        {
+            for (AISPoint point : route.points)
+            {
+                for (TreeNode node : routeTree.children)
+                {
+                    Cell majorTile = (Cell) node.value;
+                    if (majorTile.contains(point))
+                    {
+                        for (TreeNode child : node.children)
+                        {
+                            Cell minorTile = (Cell) node.value;
+                            if (minorTile.contains(point))
+                            {
+                                for (TreeNode segNode : child.children)
+                                {
+                                    RouteSegment segment
+                                            = (RouteSegment) segNode.value;
+                                    segments.add(segment);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        List<Double> probs = new ArrayList<>();
+        for (RouteSegment segment : segments)
+        {
+            State state = new State(selectedVessel.last(), 10, segment);
+            double posProb = state.evaluatePosition(vector);
+            double velProb = state.evaluateVelocity(vector);
+            double jointProb = posProb * velProb;
+            probs.add(jointProb);
+            System.out.println("pos: " + posProb);
+            System.out.println("vel: " + velProb);
+        }
+
+        double bestProb = 0;
+        int bestID = -1;
+        for (int i = 0; i < segments.size(); i++)
+        {
+            double prob = probs.get(i);
+            if (prob > bestProb)
+            {
+                bestProb = prob;
+                bestID = segments.get(i).id;
+            }
+        }
+
+        return routes.get(bestID);
     }
 
     public void calcBestRoute()
@@ -50,14 +279,12 @@ public class SelectionPanel extends javax.swing.JPanel
         int numVesselsTotal = getNumVesselsTotal(routes);
 
         List<Double> bestRouteProbs = new ArrayList<>();
+        List<Double> posProbs = new ArrayList<>();
+        List<Double> velProbs = new ArrayList<>();
         for (RouteObject route : routes)
         {
             double positionProb = route.kde.evaluatePositionConditional(vector, vector, 1);
-            double velocityProb = route.kde.evaluateVelocityConditional(vector);
-            if (velocityProb == 0)
-            {
-                velocityProb = 1E-15;
-            }
+            double velocityProb = route.kde.evaluateJointVelocity(vector);
             int numVesselsOfType = 0;
             for (Vessel vessel : route.vessels)
             {
@@ -67,6 +294,8 @@ public class SelectionPanel extends javax.swing.JPanel
             double typeAndRouteProb = (double) numVesselsOfType / numVesselsTotal;
             double bestRouteProb = positionProb * velocityProb * typeAndRouteProb;
             bestRouteProbs.add(bestRouteProb);
+            posProbs.add(positionProb);
+            velProbs.add(velocityProb);
 
             System.out.println("Route " + route.id + " Probabilities:");
             System.out.println("Position: " + positionProb);
@@ -75,20 +304,58 @@ public class SelectionPanel extends javax.swing.JPanel
             System.out.println("Best Route: " + bestRouteProb);
         }
 
-        double highestProb = 0;
+        for (int i = 0; i < routes.size(); i++)
+        {
+            double posProb = posProbs.get(i);
+            double velProb = velProbs.get(i);
+            posProbs.set(i, normalize(posProb, posProbMax));
+            velProbs.set(i, normalize(velProb, velProbMax));
+        }
+
+        double highestPosProb = 0;
+        double highestVelProb = 0;
         bestRoute = null;
         for (int i = 0; i < routes.size(); i++)
         {
-            double prob = bestRouteProbs.get(i);
-            if (prob > highestProb)
+            double posProb = posProbs.get(i);
+            double velProb = velProbs.get(i);
+            if (posProb > highestPosProb)
             {
-                highestProb = prob;
+                highestPosProb = posProb;
+                highestVelProb = velProb;
                 bestRoute = routes.get(i);
             }
         }
 
+        for (int i = 0; i < routes.size(); i++)
+        {
+            RouteObject route = routes.get(i);
+            double posProb = posProbs.get(i);
+            double velProb = velProbs.get(i);
+            System.out.println("Route " + route.id + " Probabilities:");
+            System.out.println("Position: " + posProb);
+            System.out.println("Velocity: " + velProb);
+        }
+
+//        double highestProb = 0;
+//        bestRoute = null;
+//        for (int i = 0; i < routes.size(); i++)
+//        {
+//            double prob = bestRouteProbs.get(i);
+//            if (prob > highestProb)
+//            {
+//                highestProb = prob;
+//                bestRoute = routes.get(i);
+//            }
+//        }
         System.out.println("Best route is Route " + bestRoute.id
-                + " with probability: " + highestProb);
+                + " with probability: " + highestPosProb + ", " + highestVelProb);
+    }
+
+    public double normalize(double originalProb, double maxProb)
+    {
+        double newProb = originalProb / maxProb;
+        return newProb;
     }
 
     public RouteObject calcBestRouteForPoint(AISPoint point)
@@ -101,10 +368,10 @@ public class SelectionPanel extends javax.swing.JPanel
         for (RouteObject route : routes)
         {
             double positionProb = route.kde.evaluatePositionConditional(vector, vector, 1);
-            double velocityProb = route.kde.evaluateVelocityConditional(vector);
+            double velocityProb = route.kde.evaluateJointVelocity(vector);
             if (velocityProb == 0)
             {
-                velocityProb = 1E-15;
+                velocityProb = 1E-20;
             }
             int numVesselsOfType = 0;
             for (Vessel vessel : route.vessels)
@@ -222,14 +489,14 @@ public class SelectionPanel extends javax.swing.JPanel
 
     public void checkGrid()
     {
-        if (drawKDECheckBox.isSelected())
-        {
-            gridOn();
-        }
-        else
-        {
-            gridOff();
-        }
+//        if (drawKDECheckBox.isSelected())
+//        {
+//            gridOn();
+//        }
+//        else
+//        {
+//            gridOff();
+//        }
     }
 
 //    public RouteObject getBestRoute()
@@ -361,10 +628,6 @@ public class SelectionPanel extends javax.swing.JPanel
             mmsiField.setText("");
             shipNameField.setText("");
             positionField.setText("");
-            formalPositionField.setText("");
-            sogField.setText("");
-            cogField.setText("");
-            shipTypeField.setText("");
             shipCategoryField.setText("");
             navigationStatusField.setText("");
             reportedDestinationField.setText("");
@@ -376,14 +639,6 @@ public class SelectionPanel extends javax.swing.JPanel
                     ? "Unknown" : selectedVessel.shipName);
             positionField.setText(String.format("(%.2f, %.2f)",
                     selectedVessel.last().lat, selectedVessel.last().lon));
-            formalPositionField.setText(String.format("(%.2f, %.2f)",
-                    selectedVessel.last().lat, selectedVessel.last().lon));
-            sogField.setText(String.format("%.1f knots",
-                    selectedVessel.last().sog));
-            cogField.setText(String.format("%.1f %s",
-                    selectedVessel.last().cog, Utils.DEGREE));
-            shipTypeField.setText((selectedVessel.shipType == null)
-                    ? "Unknown" : selectedVessel.shipType);
             shipCategoryField.setText(
                     Utils.getShipCategory(selectedVessel.shipType));
             navigationStatusField.setText((selectedVessel.navStatus == null)
@@ -406,7 +661,13 @@ public class SelectionPanel extends javax.swing.JPanel
 
         jScrollPane1 = new javax.swing.JScrollPane();
         jPanel1 = new javax.swing.JPanel();
-        foldablePanel1 = new com.nuwc.interestengine.gui.FoldablePanel();
+        jPanel3 = new javax.swing.JPanel();
+        jButton2 = new javax.swing.JButton();
+        jButton4 = new javax.swing.JButton();
+        jButton1 = new javax.swing.JButton();
+        jButton5 = new javax.swing.JButton();
+        jPanel17 = new javax.swing.JPanel();
+        jLabel5 = new javax.swing.JLabel();
         jPanel2 = new javax.swing.JPanel();
         jTextField1 = new javax.swing.JTextField();
         mmsiField = new javax.swing.JTextField();
@@ -414,35 +675,73 @@ public class SelectionPanel extends javax.swing.JPanel
         shipNameField = new javax.swing.JTextField();
         jTextField5 = new javax.swing.JTextField();
         positionField = new javax.swing.JTextField();
-        jTextField7 = new javax.swing.JTextField();
-        formalPositionField = new javax.swing.JTextField();
-        jTextField9 = new javax.swing.JTextField();
-        sogField = new javax.swing.JTextField();
-        jTextField11 = new javax.swing.JTextField();
-        cogField = new javax.swing.JTextField();
-        jTextField13 = new javax.swing.JTextField();
-        shipTypeField = new javax.swing.JTextField();
         jTextField15 = new javax.swing.JTextField();
         shipCategoryField = new javax.swing.JTextField();
         jTextField17 = new javax.swing.JTextField();
         navigationStatusField = new javax.swing.JTextField();
         jTextField19 = new javax.swing.JTextField();
         reportedDestinationField = new javax.swing.JTextField();
-        jPanel3 = new javax.swing.JPanel();
-        jButton1 = new javax.swing.JButton();
-        drawKDECheckBox = new javax.swing.JCheckBox();
-        jButton2 = new javax.swing.JButton();
-        jButton3 = new javax.swing.JButton();
-        jPanel17 = new javax.swing.JPanel();
-        jLabel5 = new javax.swing.JLabel();
 
         jScrollPane1.getVerticalScrollBar().setUnitIncrement(16);
         jScrollPane1.setVerticalScrollBarPolicy(javax.swing.ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
         jScrollPane1.setPreferredSize(new java.awt.Dimension(555, 473));
 
-        foldablePanel1.setTitle("Selection");
+        jPanel3.setLayout(new java.awt.GridLayout(1, 4));
 
-        jPanel2.setLayout(new java.awt.GridLayout(10, 2));
+        jButton2.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/loaded_icon.png"))); // NOI18N
+        jButton2.setText("Add to Fleet");
+        jButton2.addActionListener(new java.awt.event.ActionListener()
+        {
+            public void actionPerformed(java.awt.event.ActionEvent evt)
+            {
+                jButton2ActionPerformed(evt);
+            }
+        });
+        jPanel3.add(jButton2);
+
+        jButton4.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/best_route_icon.png"))); // NOI18N
+        jButton4.setText("Vessel Details");
+        jButton4.addActionListener(new java.awt.event.ActionListener()
+        {
+            public void actionPerformed(java.awt.event.ActionEvent evt)
+            {
+                jButton4ActionPerformed(evt);
+            }
+        });
+        jPanel3.add(jButton4);
+
+        jButton1.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/forecast_icon.png"))); // NOI18N
+        jButton1.setText("Best Route");
+        jButton1.addActionListener(new java.awt.event.ActionListener()
+        {
+            public void actionPerformed(java.awt.event.ActionEvent evt)
+            {
+                jButton1ActionPerformed(evt);
+            }
+        });
+        jPanel3.add(jButton1);
+
+        jButton5.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/past_track_icon.png"))); // NOI18N
+        jButton5.setText("Past Track");
+        jButton5.addActionListener(new java.awt.event.ActionListener()
+        {
+            public void actionPerformed(java.awt.event.ActionEvent evt)
+            {
+                jButton5ActionPerformed(evt);
+            }
+        });
+        jPanel3.add(jButton5);
+
+        jPanel17.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0)));
+        jPanel17.setLayout(new java.awt.BorderLayout());
+
+        jLabel5.setBackground(new java.awt.Color(255, 255, 255));
+        jLabel5.setFont(new java.awt.Font("Times New Roman", 1, 18)); // NOI18N
+        jLabel5.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        jLabel5.setText("Selected Vessel");
+        jPanel17.add(jLabel5, java.awt.BorderLayout.CENTER);
+
+        jPanel2.setLayout(new java.awt.GridLayout(6, 2));
 
         jTextField1.setEditable(false);
         jTextField1.setBackground(new java.awt.Color(255, 255, 255));
@@ -478,55 +777,12 @@ public class SelectionPanel extends javax.swing.JPanel
 
         jTextField5.setEditable(false);
         jTextField5.setBackground(new java.awt.Color(255, 255, 255));
-        jTextField5.setText("Position");
+        jTextField5.setText("Last Position");
         jPanel2.add(jTextField5);
 
         positionField.setEditable(false);
         positionField.setBackground(new java.awt.Color(255, 255, 255));
         jPanel2.add(positionField);
-
-        jTextField7.setEditable(false);
-        jTextField7.setBackground(new java.awt.Color(255, 255, 255));
-        jTextField7.setText("Position Formal");
-        jTextField7.addActionListener(new java.awt.event.ActionListener()
-        {
-            public void actionPerformed(java.awt.event.ActionEvent evt)
-            {
-                jTextField7ActionPerformed(evt);
-            }
-        });
-        jPanel2.add(jTextField7);
-
-        formalPositionField.setEditable(false);
-        formalPositionField.setBackground(new java.awt.Color(255, 255, 255));
-        jPanel2.add(formalPositionField);
-
-        jTextField9.setEditable(false);
-        jTextField9.setBackground(new java.awt.Color(255, 255, 255));
-        jTextField9.setText("Speed Over Ground");
-        jPanel2.add(jTextField9);
-
-        sogField.setEditable(false);
-        sogField.setBackground(new java.awt.Color(255, 255, 255));
-        jPanel2.add(sogField);
-
-        jTextField11.setEditable(false);
-        jTextField11.setBackground(new java.awt.Color(255, 255, 255));
-        jTextField11.setText("Course Over Ground");
-        jPanel2.add(jTextField11);
-
-        cogField.setEditable(false);
-        cogField.setBackground(new java.awt.Color(255, 255, 255));
-        jPanel2.add(cogField);
-
-        jTextField13.setEditable(false);
-        jTextField13.setBackground(new java.awt.Color(255, 255, 255));
-        jTextField13.setText("Ship Type");
-        jPanel2.add(jTextField13);
-
-        shipTypeField.setEditable(false);
-        shipTypeField.setBackground(new java.awt.Color(255, 255, 255));
-        jPanel2.add(shipTypeField);
 
         jTextField15.setEditable(false);
         jTextField15.setBackground(new java.awt.Color(255, 255, 255));
@@ -555,62 +811,6 @@ public class SelectionPanel extends javax.swing.JPanel
         reportedDestinationField.setBackground(new java.awt.Color(255, 255, 255));
         jPanel2.add(reportedDestinationField);
 
-        foldablePanel1.add(jPanel2, java.awt.BorderLayout.CENTER);
-
-        jPanel3.setLayout(new java.awt.GridLayout(1, 4));
-
-        jButton1.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/loaded_icon.png"))); // NOI18N
-        jButton1.setText("Best Route");
-        jButton1.addActionListener(new java.awt.event.ActionListener()
-        {
-            public void actionPerformed(java.awt.event.ActionEvent evt)
-            {
-                jButton1ActionPerformed(evt);
-            }
-        });
-        jPanel3.add(jButton1);
-
-        drawKDECheckBox.setText("Draw KDE");
-        drawKDECheckBox.addActionListener(new java.awt.event.ActionListener()
-        {
-            public void actionPerformed(java.awt.event.ActionEvent evt)
-            {
-                drawKDECheckBoxActionPerformed(evt);
-            }
-        });
-        jPanel3.add(drawKDECheckBox);
-
-        jButton2.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/forecast_icon.png"))); // NOI18N
-        jButton2.setText("Route Forecast");
-        jButton2.addActionListener(new java.awt.event.ActionListener()
-        {
-            public void actionPerformed(java.awt.event.ActionEvent evt)
-            {
-                jButton2ActionPerformed(evt);
-            }
-        });
-        jPanel3.add(jButton2);
-
-        jButton3.setIcon(new javax.swing.ImageIcon(getClass().getResource("/com/nuwc/interestengine/resources/gui/past_track_icon.png"))); // NOI18N
-        jButton3.setText("Past Track");
-        jButton3.addActionListener(new java.awt.event.ActionListener()
-        {
-            public void actionPerformed(java.awt.event.ActionEvent evt)
-            {
-                jButton3ActionPerformed(evt);
-            }
-        });
-        jPanel3.add(jButton3);
-
-        jPanel17.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0)));
-        jPanel17.setLayout(new java.awt.BorderLayout());
-
-        jLabel5.setBackground(new java.awt.Color(255, 255, 255));
-        jLabel5.setFont(new java.awt.Font("Times New Roman", 1, 18)); // NOI18N
-        jLabel5.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
-        jLabel5.setText("Selected Vessel");
-        jPanel17.add(jLabel5, java.awt.BorderLayout.CENTER);
-
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
         jPanel1Layout.setHorizontalGroup(
@@ -618,9 +818,9 @@ public class SelectionPanel extends javax.swing.JPanel
             .addGroup(jPanel1Layout.createSequentialGroup()
                 .addContainerGap()
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jPanel3, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(foldablePanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(jPanel17, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                    .addComponent(jPanel3, javax.swing.GroupLayout.DEFAULT_SIZE, 516, Short.MAX_VALUE)
+                    .addComponent(jPanel17, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(jPanel2, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                 .addContainerGap())
         );
         jPanel1Layout.setVerticalGroup(
@@ -630,9 +830,9 @@ public class SelectionPanel extends javax.swing.JPanel
                 .addComponent(jPanel17, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addComponent(jPanel3, javax.swing.GroupLayout.PREFERRED_SIZE, 40, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(foldablePanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addGap(18, 18, 18)
+                .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(117, Short.MAX_VALUE))
         );
 
         jScrollPane1.setViewportView(jPanel1);
@@ -645,7 +845,7 @@ public class SelectionPanel extends javax.swing.JPanel
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+            .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 300, Short.MAX_VALUE)
         );
     }// </editor-fold>//GEN-END:initComponents
 
@@ -659,11 +859,6 @@ public class SelectionPanel extends javax.swing.JPanel
         // TODO add your handling code here:
     }//GEN-LAST:event_jTextField3ActionPerformed
 
-    private void jTextField7ActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_jTextField7ActionPerformed
-    {//GEN-HEADEREND:event_jTextField7ActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_jTextField7ActionPerformed
-
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_jButton1ActionPerformed
     {//GEN-HEADEREND:event_jButton1ActionPerformed
         calcBestRoute();
@@ -673,30 +868,28 @@ public class SelectionPanel extends javax.swing.JPanel
         routePainter.setBestRoute(visibleRoute);
     }//GEN-LAST:event_jButton1ActionPerformed
 
-    private void drawKDECheckBoxActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_drawKDECheckBoxActionPerformed
-    {//GEN-HEADEREND:event_drawKDECheckBoxActionPerformed
-        checkGrid();
-    }//GEN-LAST:event_drawKDECheckBoxActionPerformed
+    private void jButton4ActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_jButton4ActionPerformed
+    {//GEN-HEADEREND:event_jButton4ActionPerformed
+        vesselFrame.setVisible(true);
+        vesselFrame.setSelectedVessel(selectedVessel);
+    }//GEN-LAST:event_jButton4ActionPerformed
+
+    private void jButton5ActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_jButton5ActionPerformed
+    {//GEN-HEADEREND:event_jButton5ActionPerformed
+        routePainter.setDrawAnomalousTrack(true);
+    }//GEN-LAST:event_jButton5ActionPerformed
 
     private void jButton2ActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_jButton2ActionPerformed
     {//GEN-HEADEREND:event_jButton2ActionPerformed
         // TODO add your handling code here:
     }//GEN-LAST:event_jButton2ActionPerformed
 
-    private void jButton3ActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_jButton3ActionPerformed
-    {//GEN-HEADEREND:event_jButton3ActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_jButton3ActionPerformed
-
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
-    private javax.swing.JTextField cogField;
-    private javax.swing.JCheckBox drawKDECheckBox;
-    private com.nuwc.interestengine.gui.FoldablePanel foldablePanel1;
-    private javax.swing.JTextField formalPositionField;
     private javax.swing.JButton jButton1;
     private javax.swing.JButton jButton2;
-    private javax.swing.JButton jButton3;
+    private javax.swing.JButton jButton4;
+    private javax.swing.JButton jButton5;
     private javax.swing.JLabel jLabel5;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel17;
@@ -704,22 +897,16 @@ public class SelectionPanel extends javax.swing.JPanel
     private javax.swing.JPanel jPanel3;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JTextField jTextField1;
-    private javax.swing.JTextField jTextField11;
-    private javax.swing.JTextField jTextField13;
     private javax.swing.JTextField jTextField15;
     private javax.swing.JTextField jTextField17;
     private javax.swing.JTextField jTextField19;
     private javax.swing.JTextField jTextField3;
     private javax.swing.JTextField jTextField5;
-    private javax.swing.JTextField jTextField7;
-    private javax.swing.JTextField jTextField9;
     private javax.swing.JTextField mmsiField;
     private javax.swing.JTextField navigationStatusField;
     private javax.swing.JTextField positionField;
     private javax.swing.JTextField reportedDestinationField;
     private javax.swing.JTextField shipCategoryField;
     private javax.swing.JTextField shipNameField;
-    private javax.swing.JTextField shipTypeField;
-    private javax.swing.JTextField sogField;
     // End of variables declaration//GEN-END:variables
 }

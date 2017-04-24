@@ -73,11 +73,13 @@ public class MainFrame extends JFrame implements KeyListener
          */
         mapPanel = getMap();
         miniMap = new JXMapKit();
+        VesselFrame vesselFrame = new VesselFrame(getRoutePainter(getMap()));
         optionsPanel = new OptionsPanel(getShips(), getSimulation(),
                 getMarkers(), getRoutePainter(getMap()), miniMap, this);
         selectionPanel = new SelectionPanel(getRoutePainter(getMap()), this,
-                optionsPanel);
+                optionsPanel, vesselFrame);
         optionsPanel.setSelectionPanel(selectionPanel);
+        optionsPanel.setVesselFrame(vesselFrame);
 
         setLayout(new BorderLayout());
         JSplitPane sidePanel = new JSplitPane(JSplitPane.VERTICAL_SPLIT, selectionPanel, optionsPanel);

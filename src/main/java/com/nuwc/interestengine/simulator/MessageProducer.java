@@ -1,5 +1,6 @@
 package com.nuwc.interestengine.simulator;
 
+import com.nuwc.interestengine.Utils;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -17,11 +18,22 @@ public class MessageProducer implements Runnable
     ConcurrentLinkedQueue messageQueue;
     private long firstTimestamp = 0;
     private long firstTime = 0;
+    private float simRate = 1;
 
     public MessageProducer(File files[], ConcurrentLinkedQueue messageQueue)
     {
         this.files = files;
         this.messageQueue = messageQueue;
+    }
+
+    public synchronized void setSimRate(float simRate)
+    {
+        this.simRate = simRate;
+    }
+
+    public synchronized float getSimRate(float simRate)
+    {
+        return simRate;
     }
 
     public final synchronized void requestStop()
@@ -87,8 +99,8 @@ public class MessageProducer implements Runnable
                         fileTime = (timestamp - firstTimestamp) * 1000;
                         realTime = time - firstTime;
                     }
-                    while (fileTime > realTime);
-                    
+                    while (fileTime > simRate * realTime);
+
                     messageQueue.offer(line);
                 }
             }

@@ -6,6 +6,8 @@ import com.nuwc.interestengine.data.DataPoint;
 import com.nuwc.interestengine.data.Database;
 import com.nuwc.interestengine.gui.MainFrame;
 import com.nuwc.interestengine.data.AISPoint;
+import com.nuwc.interestengine.data.Cell;
+import com.nuwc.interestengine.data.TreeNode;
 import com.nuwc.interestengine.map.RoutePainter;
 import java.awt.Color;
 import java.awt.Point;
@@ -16,7 +18,6 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -35,6 +36,10 @@ public class RouteExtractor
     private final int exitMinPoints;
     private final float stopEpsilon;
     private final int stopMinPoints;
+    private final float minLat;
+    private final float minLon;
+    private final float maxLat;
+    private final float maxLon;
 
     private final HashMap<Integer, Vessel> vessels;
     private final HashMap<Integer, Integer> vesselWaypointCounts;
@@ -44,6 +49,7 @@ public class RouteExtractor
     private final List<AISPoint> aisPoints;
 
     private HashMap<Point, RouteObject> routes;
+    private TreeNode routeTree;
     private int id = 0;
     private String routesPath;
 
@@ -60,7 +66,8 @@ public class RouteExtractor
             float lostTime, float minSpeed,
             float entryEpsilon, int entryMinPoints,
             float exitEpsilon, int exitMinPoints,
-            float stopEpsilon, int stopMinPoints)
+            float stopEpsilon, int stopMinPoints,
+            float minLat, float minLon, float maxLat, float maxLon)
     {
         this.db = db;
         this.painter = painter;
@@ -73,6 +80,10 @@ public class RouteExtractor
         this.exitMinPoints = exitMinPoints;
         this.stopEpsilon = stopEpsilon;
         this.stopMinPoints = stopMinPoints;
+        this.minLat = minLat;
+        this.minLon = minLon;
+        this.maxLat = maxLat;
+        this.maxLon = maxLon;
 
         vessels = new HashMap<>();
         vesselWaypointCounts = new HashMap<>();
@@ -82,6 +93,8 @@ public class RouteExtractor
         aisPoints = new ArrayList<>();
 
         routes = new HashMap<>();
+        routeTree = new TreeNode(null);
+        initTree();
         init();
 
         clusterList = new ArrayList<>();
@@ -92,6 +105,63 @@ public class RouteExtractor
         entryIndex = 0;
         exitIndex = 0;
         stopIndex = 0;
+    }
+
+    private void initTree()
+    {
+        int xCells = 4;
+        int yCells = 4;
+        float latDiff = maxLat - minLat;
+        float lonDiff = maxLon - minLon;
+        float latDelta = latDiff / yCells;
+        float lonDelta = lonDiff / xCells;
+
+        for (int i = 0; i < xCells; i++)
+        {
+            for (int j = 0; j < yCells; j++)
+            {
+                float maxLatCell = maxLat - j * latDelta;
+                float minLatCell = maxLatCell - latDelta;
+                float minLonCell = minLon + i * lonDelta;
+                float maxLonCell = minLonCell + lonDelta;
+                Cell cell = new Cell(minLatCell, maxLatCell,
+                        minLonCell, maxLonCell);
+                routeTree.addChild(cell);
+            }
+        }
+
+        for (TreeNode child : routeTree.children)
+        {
+            Cell cell = (Cell) child.value;
+            latDiff = cell.maxLat - cell.minLat;
+            lonDiff = cell.maxLon - cell.minLon;
+            latDelta = latDiff / yCells;
+            lonDelta = lonDiff / xCells;
+            for (int i = 0; i < xCells; i++)
+            {
+                for (int j = 0; j < yCells; j++)
+                {
+                    float maxLatCell = cell.maxLat - j * latDelta;
+                    float minLatCell = maxLatCell - latDelta;
+                    float minLonCell = cell.minLon + i * lonDelta;
+                    float maxLonCell = minLonCell + lonDelta;
+                    Cell innerCell = new Cell(minLatCell, maxLatCell,
+                            minLonCell, maxLonCell);
+                    child.addChild(innerCell);
+                    float centerLat = (innerCell.maxLat + innerCell.minLat) / 2;
+                    float centerLon = (innerCell.maxLon + innerCell.minLon) / 2;
+                    AISPoint test = new AISPoint(centerLat, centerLon, 0, 0, 0);
+                    if (cell.contains(test))
+                    {
+                        System.out.println("TRUE");
+                    }
+                    else
+                    {
+                        System.out.println("FALSE");
+                    }
+                }
+            }
+        }
     }
 
     private void init()
@@ -212,6 +282,11 @@ public class RouteExtractor
         return oversampledRoutes;
     }
 
+    public TreeNode getRouteTree()
+    {
+        return routeTree;
+    }
+
     public int getNumberOfClusters()
     {
         int count = 0;
@@ -301,6 +376,25 @@ public class RouteExtractor
         painter.setStopPoints(stopPoints);
 
         System.out.println("Route Extraction 2 Complete.");
+
+        int i, j;
+        i = 1;
+        for (TreeNode node : routeTree.children)
+        {
+            System.out.println("Tile " + i);
+            j = 1;
+            for (TreeNode child : node.children)
+            {
+                System.out.println("    Tile " + j);
+                for (TreeNode segNode : child.children)
+                {
+                    RouteSegment segment = (RouteSegment) segNode.value;
+                    System.out.println("        route id: " + segment.id + ", points: " + segment.points.size());
+                }
+                j++;
+            }
+            i++;
+        }
 
         return validRoutes;
     }
@@ -393,10 +487,14 @@ public class RouteExtractor
                         && point.timestamp <= timestampY)
                 {
                     route.points.add(point);
+                    RouteSegment segment = addToTree(point, routeTree, route.id);
+                    segment.vessels.add(v);
+                    segment.waypoints.add(waypointX);
+                    segment.waypoints.add(waypointY);
                 }
             }
-            route.vessels.add(v);
 
+            route.vessels.add(v);
             route.waypoints.add(waypointX);
             route.waypoints.add(waypointY);
 
@@ -406,6 +504,54 @@ public class RouteExtractor
         {
             vesselWaypointCounts.put(v.mmsi, 0);
         }
+    }
+
+    private RouteSegment addToTree(AISPoint point, TreeNode node, int id)
+    {
+        System.out.println(node.children.size());
+        if (node.children.isEmpty())
+        {
+            RouteSegment segment = new RouteSegment(id);
+            segment.points.add(point);
+            node.addChild(segment);
+            System.out.println("BASE 1");
+            return segment;
+        }
+
+        if (node.children.get(0).value instanceof RouteSegment)
+        {
+            for (TreeNode child : node.children)
+            {
+                System.out.println("NODE");
+                RouteSegment segment = (RouteSegment) child.value;
+                if (segment.id == id)
+                {
+                    segment.points.add(point);
+                    System.out.println("BASE 2");
+                    return segment;
+                }
+            }
+
+            RouteSegment segment = new RouteSegment(id);
+            segment.points.add(point);
+            node.addChild(segment);
+            return segment;
+        }
+
+        RouteSegment segment = null;
+        for (TreeNode child : node.children)
+        {
+            Cell cell = (Cell) child.value;
+            if (cell.contains(point))
+            {
+                System.out.println("CONTAINS");
+                segment = addToTree(point, child, id);
+                break;
+            }
+        }
+        System.out.println("TEST");
+
+        return segment;
     }
 
     private void updateClusters(Vessel v, List<AISPoint> dataset)
