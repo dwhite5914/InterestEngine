@@ -19,7 +19,6 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.JFrame;
-import javax.swing.JInternalFrame;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JSplitPane;
@@ -34,8 +33,8 @@ import org.jxmapviewer.viewer.TileFactoryInfo;
 public class MainFrame extends JFrame implements KeyListener
 {
     // Attributes
-    private static final int MIN_WIDTH = 1200;
-    private static final int MIN_HEIGHT = 800;
+    private static final int MIN_WIDTH = 1600;
+    private static final int MIN_HEIGHT = 900;
     private JXMapKit mapKit;
     private JPanel mapPanel;
     private JXMapKit miniMap;
@@ -87,6 +86,7 @@ public class MainFrame extends JFrame implements KeyListener
         sidePanel.setResizeWeight(0.4);
         sidePanel.setContinuousLayout(true);
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, mapPanel, sidePanel);
+        splitPane.setOneTouchExpandable(true);
         splitPane.setDividerLocation(0.8);
         splitPane.setResizeWeight(0.9);
         splitPane.setContinuousLayout(true);

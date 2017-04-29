@@ -549,7 +549,6 @@ public class RoutePainter implements Painter<JXMapViewer>
 
         if (selectedVessel != null)
         {
-            selectedVessel.draw(g, map, false, true);
             if (drawAnomalousTrack)
             {
                 for (AISPoint point : selectedVessel.track)
@@ -560,14 +559,11 @@ public class RoutePainter implements Painter<JXMapViewer>
                     paintMarker(g, mapPoint, color);
                 }
             }
+            selectedVessel.draw(g, map, false, true);
         }
 
         if (focusedVessel != null)
         {
-            if (!allowedShipTypes.contains(focusedVessel.shipType))
-            {
-                selectedVessel = null;
-            }
             focusedVessel.draw(g, map, true, false);
         }
     }

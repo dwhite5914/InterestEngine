@@ -3,13 +3,12 @@ package com.nuwc.interestengine;
 import com.nuwc.interestengine.gui.MainFrame;
 import javax.swing.UIManager;
 import javax.swing.UIManager.LookAndFeelInfo;
-import javax.swing.UnsupportedLookAndFeelException;
 
 public class InterestEngine
 {
     public static void main(String args[])
     {
-        // Set look and feel.
+        // Set look and feel
         try
         {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
@@ -31,7 +30,7 @@ public class InterestEngine
             }
             catch (Exception ex)
             {
-                // not worth my time
+                // Pass
             }
         }
 

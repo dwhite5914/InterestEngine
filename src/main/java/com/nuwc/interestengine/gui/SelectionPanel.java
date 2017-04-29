@@ -54,89 +54,94 @@ public class SelectionPanel extends javax.swing.JPanel
 
     public void train()
     {
-        List<RouteObject> routes = optionsPanel.getRoutes();
-        for (RouteObject route : routes)
-        {
-            route.kde = new KernelDensityEstimator();
-            route.kde.fit(route);
-        }
-        System.out.println("-----------Trained-----------");
-
-        List<Double> posProbs = new ArrayList<>();
-        double maxPosProb = 0;
-        double meanPosProb = 0;
-        double stdevPosProb = 0;
-        int numPoints = 0;
-
-        List<Double> velProbs = new ArrayList<>();
-        double meanVelProb = 0;
-        double maxVelProb = 0;
-
-        for (RouteObject route : routes)
-        {
-            for (AISPoint point : route.points)
-            {
-                StateVector vector = point.toVector();
-                double posProb = route.kde.evaluatePositionConditional(vector, vector, 1);
-                double velProb = route.kde.evaluateJointVelocity(vector);
-                posProbs.add(posProb);
-                velProbs.add(velProb);
-                if (posProb > maxPosProb)
-                {
-                    maxPosProb = posProb;
-                }
-                if (velProb > maxVelProb)
-                {
-                    maxVelProb = velProb;
-                }
-                numPoints++;
-            }
-        }
-
-        for (double prob : posProbs)
-        {
-            meanPosProb += prob;
-        }
-        meanPosProb /= numPoints;
-
-        for (double prob : velProbs)
-        {
-            meanVelProb += prob;
-        }
-        meanVelProb /= numPoints;
-
-        for (double prob : posProbs)
-        {
-            stdevPosProb += Math.pow(prob - meanPosProb, 2);
-        }
-        stdevPosProb /= numPoints;
-
-        double stdevVelProb = 0;
-        for (double prob : velProbs)
-        {
-            stdevVelProb += Math.pow(prob - meanVelProb, 2);
-        }
-        stdevVelProb /= numPoints;
-
-        posProbMax = meanPosProb;
-        velProbMax = meanVelProb;
-        velStdev = stdevVelProb;
-
-        probSoftMax = meanPosProb + 3 * stdevPosProb;
-        probMean = meanPosProb;
-        probStdev = stdevPosProb;
+//        List<RouteObject> routes = optionsPanel.getRoutes();
+//        for (RouteObject route : routes)
+//        {
+//            route.kde = new KernelDensityEstimator();
+//            route.kde.fit(route);
+//        }
+//        System.out.println("-----------Trained-----------");
+//
+//        List<Double> posProbs = new ArrayList<>();
+//        double maxPosProb = 0;
+//        double meanPosProb = 0;
+//        double stdevPosProb = 0;
+//        int numPoints = 0;
+//
+//        List<Double> velProbs = new ArrayList<>();
+//        double meanVelProb = 0;
+//        double maxVelProb = 0;
+//
+//        for (RouteObject route : routes)
+//        {
+//            for (AISPoint point : route.points)
+//            {
+//                StateVector vector = point.toVector();
+//                double posProb = route.kde.evaluatePositionConditional(vector, vector, 1);
+//                double velProb = route.kde.evaluateJointVelocity(vector);
+//                posProbs.add(posProb);
+//                velProbs.add(velProb);
+//                if (posProb > maxPosProb)
+//                {
+//                    maxPosProb = posProb;
+//                }
+//                if (velProb > maxVelProb)
+//                {
+//                    maxVelProb = velProb;
+//                }
+//                numPoints++;
+//            }
+//        }
+//
+//        for (double prob : posProbs)
+//        {
+//            meanPosProb += prob;
+//        }
+//        meanPosProb /= numPoints;
+//
+//        for (double prob : velProbs)
+//        {
+//            meanVelProb += prob;
+//        }
+//        meanVelProb /= numPoints;
+//
+//        for (double prob : posProbs)
+//        {
+//            stdevPosProb += Math.pow(prob - meanPosProb, 2);
+//        }
+//        stdevPosProb /= numPoints;
+//
+//        double stdevVelProb = 0;
+//        for (double prob : velProbs)
+//        {
+//            stdevVelProb += Math.pow(prob - meanVelProb, 2);
+//        }
+//        stdevVelProb /= numPoints;
+//
+//        posProbMax = meanPosProb;
+//        velProbMax = meanVelProb;
+//        velStdev = stdevVelProb;
+//
+//        probSoftMax = meanPosProb + 3 * stdevPosProb;
+//        probMean = meanPosProb;
+//        probStdev = stdevPosProb;
     }
 
     public boolean isAnomaly(Vessel v)
     {
         AISPoint point = v.last();
         StateVector vector = point.toVector();
-        RouteObject bestRoute = calcBestRouteForPoint(point);
-        int numPoints = bestRoute.points.size();
+        RouteObject best = getBestRoutePoint(v);
+        if (best == null && !Utils.isAnchored(v.navStatus) && v.last().sog > 1)
+        {
+            return true;
+        }
+
+        int numPoints = best.points.size();
         AnomalyChecker checkers[] = new AnomalyChecker[8];
         for (int i = 0; i < 8; i++)
         {
-            checkers[i] = new AnomalyChecker(i, point, bestRoute);
+            checkers[i] = new AnomalyChecker(i, point, best);
             checkers[i].start();
         }
 
@@ -162,7 +167,7 @@ public class SelectionPanel extends javax.swing.JPanel
             }
         }
 
-        if (minDist < 4 || Utils.isAnchored(v.navStatus) || v.last().sog < 0.12)
+        if (minDist < 4 || Utils.isAnchored(v.navStatus) || v.last().sog <= 1)
         {
             return false;
         }
@@ -176,6 +181,7 @@ public class SelectionPanel extends javax.swing.JPanel
         private AISPoint point;
         private RouteObject route;
         private double minDist;
+        private List<AISPoint> points = new ArrayList<>();
 
         public AnomalyChecker(int i, AISPoint point, RouteObject route)
         {
@@ -212,64 +218,157 @@ public class SelectionPanel extends javax.swing.JPanel
 
     }
 
+    public RouteObject getBestRoutePoint(AISPoint current)
+    {
+        List<RouteObject> routes = optionsPanel.getRoutes();
+
+        double radius = 5;
+        double minCogDist = 360;
+        RouteObject best = null;
+        double scores[] = new double[routes.size()];
+        int i = 0;
+        for (RouteObject route : routes)
+        {
+            double meanCog = 0;
+            double minDist = 5;
+            for (AISPoint point : route.points)
+            {
+                double dist = point.distance(current);
+                if (dist < minDist)
+                {
+                    minDist = dist;
+                }
+                if (minDist < radius)
+                {
+                    meanCog += point.cog;
+                }
+            }
+            if (minDist < radius)
+            {
+                scores[i] += 1.0 / (minDist * minDist);
+                meanCog /= route.points.size();
+                double cogDist = Math.abs(current.cog - meanCog);
+                scores[i] += 1.0 / (cogDist * cogDist);
+            }
+
+            i++;
+        }
+
+        double maxScore = 0;
+        for (i = 0; i < routes.size(); i++)
+        {
+            if (scores[i] > maxScore)
+            {
+                maxScore = scores[i];
+                best = routes.get(i);
+            }
+        }
+
+        return best;
+    }
+
+    public RouteObject getBestRoutePoint(Vessel v)
+    {
+        List<RouteObject> routes = optionsPanel.getRoutes();
+        AISPoint current = v.last();
+
+        double radius = 5;
+        RouteObject best = null;
+        double scores[] = new double[routes.size()];
+        int i = 0;
+        for (RouteObject route : routes)
+        {
+            double meanCog = 0;
+            double minDist = 5;
+            int numCog = 0;
+            for (AISPoint point : route.points)
+            {
+                double dist = point.distance(current);
+                if (dist < minDist)
+                {
+                    minDist = dist;
+                }
+                if (dist < radius)
+                {
+                    meanCog += point.cog;
+                    numCog++;
+                }
+            }
+            if (minDist < radius)
+            {
+                minDist /= 5;
+                scores[i] += 1.0 / (minDist * minDist);
+                meanCog /= numCog;
+                double cogDist = Math.abs(current.cog - meanCog) / 360;
+                scores[i] += 1.0 / (cogDist * cogDist);
+            }
+
+            i++;
+        }
+
+        double maxScore = 0;
+        for (i = 0; i < routes.size(); i++)
+        {
+            if (scores[i] > maxScore)
+            {
+                maxScore = scores[i];
+                best = routes.get(i);
+            }
+        }
+
+        return best;
+    }
+
     public RouteObject getBestRoute()
     {
         List<RouteObject> routes = optionsPanel.getRoutes();
-        StateVector vector = selectedVessel.last().toVector();
-        List<RouteSegment> segments = new ArrayList<>();
+        AISPoint current = selectedVessel.last();
+
+        double radius = 5;
+        RouteObject best = null;
+        double scores[] = new double[routes.size()];
+        int i = 0;
         for (RouteObject route : routes)
         {
+            double meanCog = 0;
+            double minDist = 5;
+            int numCog = 0;
             for (AISPoint point : route.points)
             {
-                for (TreeNode node : routeTree.children)
+                double dist = point.distance(current);
+                if (dist < minDist)
                 {
-                    Cell majorTile = (Cell) node.value;
-                    if (majorTile.contains(point))
-                    {
-                        for (TreeNode child : node.children)
-                        {
-                            Cell minorTile = (Cell) node.value;
-                            if (minorTile.contains(point))
-                            {
-                                for (TreeNode segNode : child.children)
-                                {
-                                    RouteSegment segment
-                                            = (RouteSegment) segNode.value;
-                                    segments.add(segment);
-                                }
-                                break;
-                            }
-                        }
-                    }
+                    minDist = dist;
+                }
+                if (dist < radius)
+                {
+                    meanCog += point.cog;
+                    numCog++;
                 }
             }
-        }
-
-        List<Double> probs = new ArrayList<>();
-        for (RouteSegment segment : segments)
-        {
-            State state = new State(selectedVessel.last(), 10, segment);
-            double posProb = state.evaluatePosition(vector);
-            double velProb = state.evaluateVelocity(vector);
-            double jointProb = posProb * velProb;
-            probs.add(jointProb);
-            System.out.println("pos: " + posProb);
-            System.out.println("vel: " + velProb);
-        }
-
-        double bestProb = 0;
-        int bestID = -1;
-        for (int i = 0; i < segments.size(); i++)
-        {
-            double prob = probs.get(i);
-            if (prob > bestProb)
+            if (minDist < radius)
             {
-                bestProb = prob;
-                bestID = segments.get(i).id;
+                minDist /= 5;
+                scores[i] += 1.0 / (minDist * minDist);
+                meanCog /= numCog;
+                double cogDist = Math.abs(current.cog - meanCog) / 360;
+                scores[i] += 1.0 / (cogDist * cogDist);
+            }
+
+            i++;
+        }
+
+        double maxScore = 0;
+        for (i = 0; i < routes.size(); i++)
+        {
+            if (scores[i] > maxScore)
+            {
+                maxScore = scores[i];
+                best = routes.get(i);
             }
         }
 
-        return routes.get(bestID);
+        return best;
     }
 
     public void calcBestRoute()
@@ -337,17 +436,6 @@ public class SelectionPanel extends javax.swing.JPanel
             System.out.println("Velocity: " + velProb);
         }
 
-//        double highestProb = 0;
-//        bestRoute = null;
-//        for (int i = 0; i < routes.size(); i++)
-//        {
-//            double prob = bestRouteProbs.get(i);
-//            if (prob > highestProb)
-//            {
-//                highestProb = prob;
-//                bestRoute = routes.get(i);
-//            }
-//        }
         System.out.println("Best route is Route " + bestRoute.id
                 + " with probability: " + highestPosProb + ", " + highestVelProb);
     }
@@ -423,7 +511,7 @@ public class SelectionPanel extends javax.swing.JPanel
             List<AISPoint> downsampled = points.subList(0, numPoints - excess - 1);
             for (AISPoint point : downsampled)
             {
-                RouteObject best = calcBestRouteForPoint(point);
+                RouteObject best = getBestRoutePoint(point);
                 if (best.id == route.id)
                 {
                     numCorrect++;
@@ -861,10 +949,14 @@ public class SelectionPanel extends javax.swing.JPanel
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_jButton1ActionPerformed
     {//GEN-HEADEREND:event_jButton1ActionPerformed
-        calcBestRoute();
-        RouteObject visibleRoute = new RouteObject(bestRoute.id);
-        visibleRoute.points = bestRoute.points;
-        visibleRoute.color = Color.BLUE;
+        RouteObject best = getBestRoute();
+        if (best == null)
+        {
+            routePainter.setBestRoute(null);
+        }
+        RouteObject visibleRoute = new RouteObject(best.id);
+        visibleRoute.points = best.points;
+        visibleRoute.color = Color.BLACK;
         routePainter.setBestRoute(visibleRoute);
     }//GEN-LAST:event_jButton1ActionPerformed
 

@@ -425,7 +425,6 @@ public class RouteExtractor
             if (vessel.averageSpeed < minSpeed
                     && vessel.status == ShipStatus.SAILING)
             {
-                //System.out.println("SPEED");
                 vessel.status = ShipStatus.STATIONARY;
                 updateClusters(vessel, stopPoints);
                 stopPoints.add(point);
@@ -487,10 +486,10 @@ public class RouteExtractor
                         && point.timestamp <= timestampY)
                 {
                     route.points.add(point);
-                    RouteSegment segment = addToTree(point, routeTree, route.id);
-                    segment.vessels.add(v);
-                    segment.waypoints.add(waypointX);
-                    segment.waypoints.add(waypointY);
+//                    RouteSegment segment = addToTree(point, routeTree, route.id);
+//                    segment.vessels.add(v);
+//                    segment.waypoints.add(waypointX);
+//                    segment.waypoints.add(waypointY);
                 }
             }
 
@@ -514,7 +513,6 @@ public class RouteExtractor
             RouteSegment segment = new RouteSegment(id);
             segment.points.add(point);
             node.addChild(segment);
-            System.out.println("BASE 1");
             return segment;
         }
 
@@ -522,12 +520,10 @@ public class RouteExtractor
         {
             for (TreeNode child : node.children)
             {
-                System.out.println("NODE");
                 RouteSegment segment = (RouteSegment) child.value;
                 if (segment.id == id)
                 {
                     segment.points.add(point);
-                    System.out.println("BASE 2");
                     return segment;
                 }
             }
@@ -544,13 +540,10 @@ public class RouteExtractor
             Cell cell = (Cell) child.value;
             if (cell.contains(point))
             {
-                System.out.println("CONTAINS");
                 segment = addToTree(point, child, id);
                 break;
             }
         }
-        System.out.println("TEST");
-
         return segment;
     }
 

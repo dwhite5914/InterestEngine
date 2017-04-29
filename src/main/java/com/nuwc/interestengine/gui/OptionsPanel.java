@@ -515,8 +515,6 @@ public class OptionsPanel extends javax.swing.JPanel
         simulationRateSlider = new javax.swing.JSlider();
         simulationRateValueLabel = new javax.swing.JLabel();
         jLabel7 = new javax.swing.JLabel();
-        jSlider2 = new javax.swing.JSlider();
-        jLabel8 = new javax.swing.JLabel();
         jPanel16 = new javax.swing.JPanel();
         jLabel4 = new javax.swing.JLabel();
         shipTypesChart = new com.nuwc.interestengine.gui.JChartPanel();
@@ -1430,14 +1428,6 @@ public class OptionsPanel extends javax.swing.JPanel
 
         jLabel7.setText("Simulation Rate");
 
-        jSlider2.setMajorTickSpacing(100);
-        jSlider2.setMaximum(300);
-        jSlider2.setMinimum(1);
-        jSlider2.setMinorTickSpacing(1);
-        jSlider2.setValue(10);
-
-        jLabel8.setText("10");
-
         javax.swing.GroupLayout jPanel2Layout = new javax.swing.GroupLayout(jPanel2);
         jPanel2.setLayout(jPanel2Layout);
         jPanel2Layout.setHorizontalGroup(
@@ -1457,11 +1447,7 @@ public class OptionsPanel extends javax.swing.JPanel
                                 .addComponent(simulationRateSlider, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                                 .addComponent(simulationRateValueLabel))
-                            .addComponent(jLabel7)
-                            .addGroup(jPanel2Layout.createSequentialGroup()
-                                .addComponent(jSlider2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(jLabel8)))
+                            .addComponent(jLabel7))
                         .addGap(0, 0, Short.MAX_VALUE)))
                 .addContainerGap())
         );
@@ -1479,11 +1465,7 @@ public class OptionsPanel extends javax.swing.JPanel
                 .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(simulationRateSlider, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(simulationRateValueLabel))
-                .addGap(18, 18, 18)
-                .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jSlider2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(jLabel8))
-                .addContainerGap(140, Short.MAX_VALUE))
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         aisSimulationAccordion.add(jPanel2, java.awt.BorderLayout.CENTER);
@@ -1528,10 +1510,10 @@ public class OptionsPanel extends javax.swing.JPanel
                 .addContainerGap()
                 .addComponent(jPanel16, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(aisSimulationAccordion, javax.swing.GroupLayout.PREFERRED_SIZE, 326, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(49, 49, 49)
+                .addComponent(aisSimulationAccordion, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(18, 18, 18)
                 .addComponent(shipTypesChart, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(1396, Short.MAX_VALUE))
+                .addContainerGap(1600, Short.MAX_VALUE))
         );
 
         jScrollPane3.setViewportView(jPanel6);
@@ -1898,7 +1880,6 @@ public class OptionsPanel extends javax.swing.JPanel
     private javax.swing.JLabel jLabel4;
     private javax.swing.JLabel jLabel5;
     private javax.swing.JLabel jLabel7;
-    private javax.swing.JLabel jLabel8;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel10;
     private javax.swing.JPanel jPanel11;
@@ -1922,7 +1903,6 @@ public class OptionsPanel extends javax.swing.JPanel
     private javax.swing.JScrollPane jScrollPane4;
     private javax.swing.JScrollPane jScrollPane5;
     private javax.swing.JScrollPane jScrollPane6;
-    private javax.swing.JSlider jSlider2;
     private javax.swing.JTabbedPane jTabbedPane1;
     private javax.swing.JTextField jTextField1;
     private javax.swing.JTextField jTextField10;
